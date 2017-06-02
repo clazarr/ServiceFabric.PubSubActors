@@ -3,14 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Fabric;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.ServiceFabric.Services.Communication.Runtime;
-using Microsoft.ServiceFabric.Services.Runtime;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.ServiceFabric.Services.Runtime;
 using ServiceFabric.PubSubActors.Helpers;
-using ServiceFabric.PubSubActors.PublisherServices;
 
 namespace PublisherService
 {
@@ -19,14 +17,21 @@ namespace PublisherService
     /// </summary>
     internal sealed class PublisherService : StatelessService
     {
-	    private static readonly string Messagesettings = "MessageSettings";
+        #region Private Fields
 
+        private static readonly string Messagesettings = "MessageSettings";
 
-	    public PublisherService(StatelessServiceContext context)
+        #endregion Private Fields
+
+        #region Public Constructors
+
+        public PublisherService(StatelessServiceContext context)
             : base(context)
         { }
 
-       
+        #endregion Public Constructors
+
+        #region Protected Methods
 
         /// <summary>
         /// Publish the configured amount of messages.
@@ -43,14 +48,12 @@ namespace PublisherService
                 await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);
             }
 
-
-            int ammount;
+            int amount;
             setting = GetConfigurationValue(Context, Messagesettings, "Amount");
-            if (string.IsNullOrWhiteSpace(setting) || !int.TryParse(setting, out ammount))
+            if (string.IsNullOrWhiteSpace(setting) || !int.TryParse(setting, out amount))
             {
                 return;
             }
-
 
             int messageTypeCount;
             setting = GetConfigurationValue(Context, Messagesettings, "MessageTypeCount");
@@ -59,15 +62,14 @@ namespace PublisherService
                 return;
             }
 
+            bool useConcurrentBroker = false;
+            setting = GetConfigurationValue(Context, Messagesettings, "UseConcurrentBroker");
+            if (!string.IsNullOrWhiteSpace(setting))
+            {
+                bool.TryParse(setting, out useConcurrentBroker);
+            }
 
-			bool useConcurrentBroker = false;
-			setting = GetConfigurationValue(Context, Messagesettings, "UseConcurrentBroker");
-			if (!string.IsNullOrWhiteSpace(setting))
-			{
-				bool.TryParse(setting, out useConcurrentBroker);
-			}
-
-			AssemblyName asmName = new AssemblyName();
+            AssemblyName asmName = new AssemblyName();
             asmName.Name = "Dynamic";
             AssemblyBuilder asmBuild = Thread.GetDomain().DefineDynamicAssembly(asmName, AssemblyBuilderAccess.RunAndSave);
             ModuleBuilder modBuild = asmBuild.DefineDynamicModule("Module", "Dynamic.dll");
@@ -79,13 +81,12 @@ namespace PublisherService
                 tb.DefineDefaultConstructor(MethodAttributes.Public);
                 types.Add(tb.CreateType());
 
-                ServiceEventSource.Current.ServiceMessage(this, $"Created Message Type {messageTypeName} ({i} of {messageTypeCount}.");
-
+                ServiceEventSource.Current.ServiceMessage(this, $"Created Message Type {messageTypeName} ({i + 1} of {messageTypeCount}).");
             }
 
             Dictionary<Type, List<object>> messagesPerType = new Dictionary<Type, List<object>>();
 
-            int basketCount = ammount / messageTypeCount;
+            int basketCount = amount / messageTypeCount;
             for (int i = 0; i < messageTypeCount; i++)
             {
                 var messages = new List<object>();
@@ -104,23 +105,22 @@ namespace PublisherService
                 MaxDegreeOfParallelism = -1
             };
 
-            
             var helper = new PublisherServiceHelper();
-           var builder = new UriBuilder(Context.CodePackageActivationContext.ApplicationName);
-	        if (useConcurrentBroker)
-	        {
-		        builder.Path += "/ConcurrentBrokerService";
-	        }
-	        else
-	        {
-		        builder.Path += "/BrokerService";
-	        }
-	        var brokerSvcLocation = builder.Uri;
+            var builder = new UriBuilder(Context.CodePackageActivationContext.ApplicationName);
+            if (useConcurrentBroker)
+            {
+                builder.Path += "/ConcurrentBrokerService";
+            }
+            else
+            {
+                builder.Path += "/BrokerService";
+            }
+            var brokerSvcLocation = builder.Uri;
 
-			ServiceEventSource.Current.ServiceMessage(this, $"Using Broker Service at '{brokerSvcLocation}'.");
-			//sending starts here:
+            ServiceEventSource.Current.ServiceMessage(this, $"Using Broker Service at '{brokerSvcLocation}'.");
+            //sending starts here:
 
-			Stopwatch sw = Stopwatch.StartNew();
+            Stopwatch sw = Stopwatch.StartNew();
             Parallel.For(0, allMessages.Length, options, i =>
             {
                 var message = allMessages[i];
@@ -128,13 +128,17 @@ namespace PublisherService
             });
             sw.Stop();
 
-            ServiceEventSource.Current.ServiceMessage(this, $"In {sw.ElapsedMilliseconds}ms - Published {ammount} instances of Message Types {string.Join(", ", types.Select(t => t.FullName))}.");
+            ServiceEventSource.Current.ServiceMessage(this, $"In {sw.ElapsedMilliseconds}ms - Published {amount} instances of Message Types {string.Join(", ", types.Select(t => t.FullName))}.");
 
             while (!cancellationToken.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
             }
         }
+
+        #endregion Protected Methods
+
+        #region Private Methods
 
         private static string GetConfigurationValue(StatelessServiceContext context, string sectionName, string parameterName)
         {
@@ -143,5 +147,7 @@ namespace PublisherService
             string endPointType = (section?.Parameters.Contains(parameterName) ?? false) ? section.Parameters[parameterName].Value : null;
             return endPointType;
         }
+
+        #endregion Private Methods
     }
 }
