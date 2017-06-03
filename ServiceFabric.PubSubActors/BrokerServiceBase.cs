@@ -13,406 +13,464 @@ using Microsoft.ServiceFabric.Services.Communication.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
 using ServiceFabric.PubSubActors.Helpers;
 using ServiceFabric.PubSubActors.Interfaces;
-using ServiceFabric.PubSubActors.PublisherActors;
 using ServiceFabric.PubSubActors.State;
-using ServiceFabric.PubSubActors.SubscriberServices;
 
 namespace ServiceFabric.PubSubActors
 {
-	/// <remarks>
-	/// Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages 
-	/// from Actors & Services calling <see cref="PublisherActorExtensions.PublishMessageAsync"/>
-	/// and forwards them to <see cref="ISubscriberActor"/> Actors and <see cref="ISubscriberService"/> Services.
-	/// Every message type is mapped to one of the partitions of this service.
-	/// </remarks>
-	public abstract class BrokerServiceBase : StatefulService, IBrokerService
-	{
-		private readonly ManualResetEventSlim _initializer = new ManualResetEventSlim(false);
-		private readonly ConcurrentDictionary<string, ReferenceWrapper> _queues =
-			new ConcurrentDictionary<string, ReferenceWrapper>();
+    /// <remarks>
+    /// Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages from Actors & Services calling 
+    /// <see cref="PublisherActorExtensions.PublishMessageAsync"/> and forwards them to <see cref="ISubscriberActor"/> Actors and 
+    /// <see cref="ISubscriberService"/> Services. Every message type is mapped to one of the partitions of this service.
+    /// </remarks>
+    public abstract class BrokerServiceBase : StatefulService, IBrokerService
+    {
+        #region Public Fields
 
-		private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1);
+        /// <summary>
+        /// The name that the <see cref="ServiceReplicaListener" /> instance will get.
+        /// </summary>
+        public const string ListenerName = "StatefulBrokerServiceFabricTransportServiceRemotingListener";
 
-		/// <summary>
-		/// Gets the state key for all subscriber queues.
-		/// </summary>
-		protected const string Subscribers = "Queues";
+        #endregion Public Fields
 
-		/// <summary>
-		/// The name that the <see cref="ServiceReplicaListener"/> instance will get.
-		/// </summary>
-		public const string ListenerName = "StatefulBrokerServiceFabricTransportServiceRemotingListener";
+        #region Protected Fields
 
-		/// <summary>
-		/// When Set, this callback will be used to trace Service messages to.
-		/// </summary>
-		protected Action<string> ServiceEventSourceMessageCallback { get; set; }
+        /// <summary>
+        /// Gets the state key for all subscriber queues.
+        /// </summary>
+        protected const string Subscribers = "Queues";
 
-		/// <summary>
-		/// Gets or sets the interval to wait before starting to publish messages. (Default: 5s after Activation)
-		/// </summary>
-		protected TimeSpan DueTime { get; set; } = TimeSpan.FromSeconds(5);
+        #endregion Protected Fields
 
-		/// <summary>
-		/// Gets or sets the interval to wait between batches of publishing messages. (Default: 5s)
-		/// </summary>
-		protected TimeSpan Period { get; set; } = TimeSpan.FromSeconds(5);
+        #region Private Fields
 
-		/// <summary>
-		/// Get or Sets the maximum period to process messages before allowing enqueuing
-		/// </summary>
-		protected TimeSpan MaxProcessingPeriod { get; set; } = TimeSpan.FromSeconds(3);
+        private readonly ManualResetEventSlim _initializer = new ManualResetEventSlim(false);
 
-		/// <summary>
-		/// Gets or Sets the maximum number of messages to de-queue in one iteration of process queue
-		/// </summary>
-		protected long MaxDequeuesInOneIteration { get; set; } = 100;
+        private readonly ConcurrentDictionary<string, ReferenceWrapper> _queues =
+            new ConcurrentDictionary<string, ReferenceWrapper>();
 
-		/// <summary>
-		/// Creates a new instance using the provided context and registers this instance for automatic discovery if needed.
-		/// </summary>
-		/// <param name="serviceContext"></param>
-		/// <param name="enableAutoDiscovery"></param>
-		protected BrokerServiceBase(StatefulServiceContext serviceContext, bool enableAutoDiscovery = true)
-			: base(serviceContext)
-		{
-			if (enableAutoDiscovery)
-			{
-				new BrokerServiceLocator().RegisterAsync(Context.ServiceName)
-					.ConfigureAwait(false)
-					.GetAwaiter()
-					.GetResult();
-			}
-		}
+        private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1);
 
-		/// <summary>
-		/// Creates a new instance using the provided context and registers this instance for automatic discovery if needed.
-		/// </summary>
-		/// <param name="serviceContext"></param>
-		/// <param name="reliableStateManagerReplica"></param>
-		/// <param name="enableAutoDiscovery"></param>
-		protected BrokerServiceBase(StatefulServiceContext serviceContext,
-			IReliableStateManagerReplica reliableStateManagerReplica, bool enableAutoDiscovery = true)
-			: base(serviceContext, reliableStateManagerReplica)
-		{
-			if (enableAutoDiscovery)
-			{
-				new BrokerServiceLocator().RegisterAsync(Context.ServiceName)
-					.ConfigureAwait(false)
-					.GetAwaiter()
-					.GetResult();
-			}
-		}
-		/// <summary>
-		/// Registers an Actor as a subscriber for messages.
-		/// </summary>
-		/// <param name="actor">Reference to the actor to register.</param>
-		/// <param name="messageTypeName">Full type name of message object.</param>
-		public async Task RegisterSubscriberAsync(ActorReference actor, string messageTypeName)
-		{
-			var actorReference = new ActorReferenceWrapper(actor);
-			await RegisterSubscriberAsync(actorReference, messageTypeName);
-		}
-		/// <summary>
-		/// Unregisters an Actor as a subscriber for messages.
-		/// </summary>
-		/// <param name="actor">Reference to the actor to unsubscribe.</param>
-		/// <param name="messageTypeName">Full type name of message object.</param>
-		/// <param name="flushQueue">Publish any remaining messages.</param>
-		public async Task UnregisterSubscriberAsync(ActorReference actor, string messageTypeName, bool flushQueue)
-		{
-			var actorReference = new ActorReferenceWrapper(actor);
-			await UnregisterSubscriberAsync(actorReference, messageTypeName);
-		}
-		/// <summary>
-		/// Registers a service as a subscriber for messages.
-		/// </summary>
-		/// <param name="messageTypeName">Full type name of message object.</param>
-		/// <param name="service">Reference to the service to register.</param>
-		public async Task RegisterServiceSubscriberAsync(ServiceReference service, string messageTypeName)
-		{
-			var serviceReference = new ServiceReferenceWrapper(service);
-			await RegisterSubscriberAsync(serviceReference, messageTypeName);
-		}
-		/// <summary>
-		/// Unregisters a service as a subscriber for messages.
-		/// </summary>
-		/// <param name="messageTypeName">Full type name of message object.</param>
-		/// <param name="service">Reference to the actor to unsubscribe.</param>
-		/// <param name="flushQueue">Publish any remaining messages.</param>
-		public async Task UnregisterServiceSubscriberAsync(ServiceReference service, string messageTypeName,
-			bool flushQueue)
-		{
-			var serviceReference = new ServiceReferenceWrapper(service);
-			await UnregisterSubscriberAsync(serviceReference, messageTypeName);
-		}
-		/// <summary>
-		/// Takes a published message and forwards it (indirectly) to all Subscribers.
-		/// </summary>
-		/// <param name="message">The message to publish</param>
-		/// <returns></returns>
-		public async Task PublishMessageAsync(MessageWrapper message)
-		{
-			await WaitForInitializeAsync(CancellationToken.None);
+        #endregion Private Fields
 
-			var myDictionary = await TimeoutRetryHelper.Execute((token, state) => StateManager.GetOrAddAsync<IReliableDictionary<string, BrokerServiceState>>(message.MessageType));
+        #region Protected Constructors
 
-			var subscribers = await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
-			{
-				var result = await myDictionary.TryGetValueAsync(tx, Subscribers);
-				if (result.HasValue)
-				{
-					return result.Value.Subscribers.ToArray();
-				}
-				return null;
-			});
+        /// <summary>
+        /// Creates a new instance using the provided context and registers this instance for automatic discovery if needed.
+        /// </summary>
+        /// <param name="serviceContext"></param>
+        /// <param name="enableAutoDiscovery"></param>
+        protected BrokerServiceBase(StatefulServiceContext serviceContext, bool enableAutoDiscovery = true)
+            : base(serviceContext)
+        {
+            if (enableAutoDiscovery)
+            {
+                new BrokerServiceLocator().RegisterAsync(Context.ServiceName)
+                    .ConfigureAwait(false)
+                    .GetAwaiter()
+                    .GetResult();
+            }
+        }
 
-			if (subscribers == null || subscribers.Length == 0) return;
+        /// <summary>
+        /// Creates a new instance using the provided context and registers this instance for automatic discovery if needed.
+        /// </summary>
+        /// <param name="serviceContext"></param>
+        /// <param name="reliableStateManagerReplica"></param>
+        /// <param name="enableAutoDiscovery"></param>
+        protected BrokerServiceBase(StatefulServiceContext serviceContext,
+            IReliableStateManagerReplica reliableStateManagerReplica, bool enableAutoDiscovery = true)
+            : base(serviceContext, reliableStateManagerReplica)
+        {
+            if (enableAutoDiscovery)
+            {
+                new BrokerServiceLocator().RegisterAsync(Context.ServiceName)
+                    .ConfigureAwait(false)
+                    .GetAwaiter()
+                    .GetResult();
+            }
+        }
 
-			ServiceEventSourceMessage($"Publishing message '{message.MessageType}' to {subscribers.Length} subscribers.");
+        #endregion Protected Constructors
 
-			await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
-			{
-				foreach (var subscriber in subscribers)
-				{
-					await EnqueueMessageAsync(message, subscriber, tx);
-				}
-				ServiceEventSourceMessage($"Published message '{message.MessageType}' to {subscribers.Length} subscribers.");
-			});
-		}
+        #region Protected Properties
 
-		protected abstract Task EnqueueMessageAsync(MessageWrapper message, Reference subscriber, ITransaction tx);
+        /// <summary>
+        /// When Set, this callback will be used to trace Service messages to.
+        /// </summary>
+        protected Action<string> ServiceEventSourceMessageCallback { get; set; }
 
+        /// <summary>
+        /// Gets or sets the interval to wait before starting to publish messages. (Default: 5s after Activation)
+        /// </summary>
+        protected TimeSpan DueTime { get; set; } = TimeSpan.FromSeconds(5);
 
-		/// <summary>
-		/// Starts a loop that processes all queued messages.
-		/// </summary>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		protected override async Task RunAsync(CancellationToken cancellationToken)
-		{
-			await WaitForInitializeAsync(cancellationToken);
+        /// <summary>
+        /// Gets or sets the interval to wait between batches of publishing messages. (Default: 5s)
+        /// </summary>
+        protected TimeSpan Period { get; set; } = TimeSpan.FromSeconds(5);
 
-			ServiceEventSourceMessage($"Sleeping for {DueTime.TotalMilliseconds}ms before starting to publish messages.");
+        /// <summary>
+        /// Get or Sets the maximum period to process messages before allowing enqueuing
+        /// </summary>
+        protected TimeSpan MaxProcessingPeriod { get; set; } = TimeSpan.FromSeconds(3);
 
-			await Task.Delay(DueTime, cancellationToken);
-			while (true)
-			{
-				cancellationToken.ThrowIfCancellationRequested();
+        /// <summary>
+        /// Gets or Sets the maximum number of messages to de-queue in one iteration of process queue
+        /// </summary>
+        protected long MaxDequeuesInOneIteration { get; set; } = 100;
 
-				//process messages for given time, then allow other transactions to enqueue messages 
-				var cts = new CancellationTokenSource(MaxProcessingPeriod);
-				var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, cancellationToken);
-				try
-				{
-					var elements = _queues.ToArray();
-					var tasks = new List<Task>(elements.Length);
+        #endregion Protected Properties
 
-					foreach (var element in elements)
-					{
-						var subscriber = element.Value;
-						string queueName = element.Key;
-						tasks.Add(ProcessQueues(linkedTokenSource.Token, subscriber, queueName));
-					}
-					await Task.WhenAll(tasks);
-				}
-				catch (TaskCanceledException)
-				{//swallow and move on..
-				}
-				catch (OperationCanceledException)
-				{//swallow and move on..
-				}
-				catch (ObjectDisposedException)
-				{//swallow and move on..
-				}
-				catch (Exception ex)
-				{
-					ServiceEventSourceMessage($"Exception caught while processing messages:'{ex.Message}'");
-					//swallow and move on..
-				}
-				finally
-				{
-					linkedTokenSource.Dispose();
-				}
-				await Task.Delay(Period, cancellationToken);
-			}
-			// ReSharper disable once FunctionNeverReturns
-		}
+        #region Public Methods
 
-		/// <inheritdoc />
-		protected override IEnumerable<ServiceReplicaListener> CreateServiceReplicaListeners()
-		{
-			//add the pubsub listener
-			yield return new ServiceReplicaListener(context =>
-				new Microsoft.ServiceFabric.Services.Remoting.FabricTransport.Runtime.
-					FabricTransportServiceRemotingListener(context, this), ListenerName);
-		}
+        /// <summary>
+        /// Registers an Actor as a subscriber for messages.
+        /// </summary>
+        /// <param name="actor">Reference to the actor to register.</param>
+        /// <param name="messageTypeName">Full type name of message object.</param>
+        public async Task RegisterSubscriberAsync(ActorReference actor, string messageTypeName)
+        {
+            var actorReference = new ActorReferenceWrapper(actor);
+            await RegisterSubscriberAsync(actorReference, messageTypeName);
+        }
 
-		/// <summary>
-		/// Blocks the calling thread until <see cref="InitializeAsync"/> is complete.
-		/// </summary>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		private async Task WaitForInitializeAsync(CancellationToken cancellationToken)
-		{
-			if (_initializer.IsSet) return;
-			await Task.Run(() => InitializeAsync(cancellationToken), cancellationToken);
-			_initializer.Wait(cancellationToken);
-		}
+        /// <summary>
+        /// Registers an Actor as a subscriber for messages that can be correlated to the subscriber.
+        /// </summary>
+        /// <param name="actor">Reference to the actor to register.</param>
+        /// <param name="messageTypeName">The full type name of the message to subscribe to.</param>
+        /// <param name="correlationId">The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).</param>
+        /// <returns>Task.</returns>
+        public async Task RegisterCorrelatedSubscriberAsync(ActorReference actor, string messageTypeName, string correlationId)
+        {
+            var actorReference = new ActorReferenceWrapper(actor, correlationId);
+            await RegisterSubscriberAsync(actorReference, messageTypeName);
+        }
 
-		/// <summary>
-		/// Loads all registered message queues from state and keeps them in memory. Avoids some locks in the statemanager.
-		/// </summary>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		private async Task InitializeAsync(CancellationToken cancellationToken)
-		{
-			if (_initializer.IsSet) return;
-			try
-			{
-				_semaphore.Wait(cancellationToken);
+        /// <summary>
+        /// Unregisters an Actor as a subscriber for messages.
+        /// </summary>
+        /// <param name="actor">Reference to the actor to unsubscribe.</param>
+        /// <param name="messageTypeName">Full type name of message object.</param>
+        /// <param name="flushQueue">Publish any remaining messages.</param>
+        public async Task UnregisterSubscriberAsync(ActorReference actor, string messageTypeName, bool flushQueue)
+        {
+            var actorReference = new ActorReferenceWrapper(actor);
+            await UnregisterSubscriberAsync(actorReference, messageTypeName);
+        }
 
-				if (_initializer.IsSet) return;
-				await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
-				{
-					_queues.Clear();
-					var enumerator = StateManager.GetAsyncEnumerator();
-					while (await enumerator.MoveNextAsync(cancellationToken))
-					{
-						var current = enumerator.Current as IReliableDictionary<string, BrokerServiceState>;
-						if (current == null) continue;
+        /// <summary>
+        /// Registers a service as a subscriber for messages.
+        /// </summary>
+        /// <param name="messageTypeName">Full type name of message object.</param>
+        /// <param name="service">Reference to the service to register.</param>
+        public async Task RegisterServiceSubscriberAsync(ServiceReference service, string messageTypeName)
+        {
+            var serviceReference = new ServiceReferenceWrapper(service);
+            await RegisterSubscriberAsync(serviceReference, messageTypeName);
+        }
 
+        /// <summary>
+        /// Registers a service as a subscriber for messages that can be correlated to the subscriber.
+        /// </summary>
+        /// <param name="messageTypeName">Full type name of message object.</param>
+        /// <param name="service">Reference to the service to register.</param>
+        /// <param name="correlationId">The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).</param>
+        public async Task RegisterCorrelatedServiceSubscriberAsync(ServiceReference service, string messageTypeName, string correlationId)
+        {
+            var serviceReference = new ServiceReferenceWrapper(service, correlationId);
+            await RegisterSubscriberAsync(serviceReference, messageTypeName);
+        }
 
-						var result = await current.TryGetValueAsync(tx, Subscribers);
-						if (!result.HasValue) continue;
+        /// <summary>
+        /// Unregisters a service as a subscriber for messages.
+        /// </summary>
+        /// <param name="messageTypeName">Full type name of message object.</param>
+        /// <param name="service">Reference to the actor to unsubscribe.</param>
+        /// <param name="flushQueue">Publish any remaining messages.</param>
+        public async Task UnregisterServiceSubscriberAsync(ServiceReference service, string messageTypeName, bool flushQueue)
+        {
+            var serviceReference = new ServiceReferenceWrapper(service);
+            await UnregisterSubscriberAsync(serviceReference, messageTypeName);
+        }
 
-						var subscribers = result.Value.Subscribers.ToList();
-						foreach (var subscriber in subscribers)
-						{
-							_queues.TryAdd(subscriber.QueueName, subscriber.ServiceOrActorReference);
-						}
-					}
-				}, cancellationToken: cancellationToken);
-				_initializer.Set();
-			}
-			finally
-			{
-				_semaphore.Release();
-			}
-		}
+        /// <summary>
+        /// Takes a published message and forwards it (indirectly) to all Subscribers.
+        /// </summary>
+        /// <param name="message">The message to publish</param>
+        /// <returns></returns>
+        public async Task PublishMessageAsync(MessageWrapper message)
+        {
+            await WaitForInitializeAsync(CancellationToken.None);
 
-		/// <summary>
-		/// Sends out queued messages for the provided queue.
-		/// </summary>
-		/// <param name="cancellationToken"></param>
-		/// <param name="subscriber"></param>
-		/// <param name="queueName"></param>
-		/// <returns></returns>
-		protected abstract Task ProcessQueues(CancellationToken cancellationToken, ReferenceWrapper subscriber, string queueName);
+            var myDictionary = await TimeoutRetryHelper.Execute((token, state) => StateManager.GetOrAddAsync<IReliableDictionary<string, BrokerServiceState>>(message.MessageType));
 
-		/// <summary>
-		/// Outputs the provided message to the <see cref="ServiceEventSourceMessageCallback"/> if it's configured.
-		/// </summary>
-		/// <param name="message"></param>
-		/// <param name="caller"></param>
-		protected void ServiceEventSourceMessage(string message, [CallerMemberName] string caller = "unknown")
-		{
-			ServiceEventSourceMessageCallback?.Invoke($"{caller} - {message}");
-		}
+            var subscribers = await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
+            {
+                var result = await myDictionary.TryGetValueAsync(tx, Subscribers);
+                if (result.HasValue)
+                {
+                    // If specified, apply message filter so that we only publish to subscribers that can be correlated to this message. Subscribers
+                    // that do not define a message filter will receive all messages. Those that do define a message filter will only receive messages
+                    // that match the filter.
+                    return result.Value.Subscribers.Where(r => r.ServiceOrActorReference.ShouldPublish(message)).ToArray();
+                }
+                return null;
+            });
 
-		/// <summary>
-		/// Registers a Service or Actor <paramref name="reference"/> as subscriber for messages of type <paramref name="messageTypeName"/>
-		/// </summary>
-		/// <param name="reference"></param>
-		/// <param name="messageTypeName"></param>
-		/// <returns></returns>
-		private async Task RegisterSubscriberAsync(ReferenceWrapper reference, string messageTypeName)
-		{
-			await WaitForInitializeAsync(CancellationToken.None);
+            if (subscribers == null || subscribers.Length == 0) return;
 
-			var myDictionary = await TimeoutRetryHelper.Execute((token, state) => StateManager.GetOrAddAsync<IReliableDictionary<string, BrokerServiceState>>(messageTypeName));
+            ServiceEventSourceMessage($"Publishing message '{message.MessageType}' to {subscribers.Length} subscribers.");
 
-			await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
-			{
-				var queueName = CreateQueueName(reference, messageTypeName);
-				var deadLetterQueueName = CreateDeadLetterQueueName(reference, messageTypeName);
+            await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
+            {
+                foreach (var subscriber in subscribers)
+                {
+                    await EnqueueMessageAsync(message, subscriber, tx);
+                }
+                ServiceEventSourceMessage($"Published message '{message.MessageType}' to {subscribers.Length} subscribers.");
+            });
+        }
 
-				Func<string, BrokerServiceState> addValueFactory = key =>
-				{
-					var newState = new BrokerServiceState(messageTypeName);
-					var subscriber = new Reference(reference, queueName, deadLetterQueueName);
-					newState = BrokerServiceState.AddSubscriber(newState, subscriber);
-					return newState;
-				};
+        #endregion Public Methods
 
-				Func<string, BrokerServiceState, BrokerServiceState> updateValueFactory = (key, current) =>
-				{
-					var subscriber = new Reference(reference, queueName, deadLetterQueueName);
-					var newState = BrokerServiceState.AddSubscriber(current, subscriber);
-					return newState;
-				};
+        #region Protected Methods
 
-				await myDictionary.AddOrUpdateAsync(tx, Subscribers, addValueFactory, updateValueFactory);
+        protected abstract Task EnqueueMessageAsync(MessageWrapper message, Reference subscriber, ITransaction tx);
 
-				await CreateQueueAsync(tx, queueName);
-				await CreateQueueAsync(tx, deadLetterQueueName);
+        /// <summary>
+        /// Starts a loop that processes all queued messages.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        protected override async Task RunAsync(CancellationToken cancellationToken)
+        {
+            await WaitForInitializeAsync(cancellationToken);
 
-				_queues.AddOrUpdate(queueName, reference, (key, old) => reference);
-				ServiceEventSourceMessage($"Registered subscriber: {reference.Name}");
-			}, cancellationToken: CancellationToken.None);
-		}
+            ServiceEventSourceMessage($"Sleeping for {DueTime.TotalMilliseconds}ms before starting to publish messages.");
 
-		protected abstract Task CreateQueueAsync(ITransaction tx, string queueName);
-		
+            await Task.Delay(DueTime, cancellationToken);
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
 
-		/// <summary>
-		/// Unregisters a Service or Actor <paramref name="reference"/> as subscriber for messages of type <paramref name="messageTypeName"/>
-		/// </summary>
-		/// <param name="reference"></param>
-		/// <param name="messageTypeName"></param>
-		/// <returns></returns>
-		private async Task UnregisterSubscriberAsync(ReferenceWrapper reference, string messageTypeName)
-		{
-			await WaitForInitializeAsync(CancellationToken.None);
+                //process messages for given time, then allow other transactions to enqueue messages
+                var cts = new CancellationTokenSource(MaxProcessingPeriod);
+                var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, cancellationToken);
+                try
+                {
+                    var elements = _queues.ToArray();
+                    var tasks = new List<Task>(elements.Length);
 
-			var myDictionary = await TimeoutRetryHelper.Execute((token, state) => StateManager.GetOrAddAsync<IReliableDictionary<string, BrokerServiceState>>(messageTypeName));
-			var queueName = CreateQueueName(reference, messageTypeName);
-			var deadLetterQueueName = CreateDeadLetterQueueName(reference, messageTypeName);
+                    foreach (var element in elements)
+                    {
+                        var subscriber = element.Value;
+                        string queueName = element.Key;
+                        tasks.Add(ProcessQueues(linkedTokenSource.Token, subscriber, queueName));
+                    }
+                    await Task.WhenAll(tasks);
+                }
+                catch (TaskCanceledException)
+                {//swallow and move on..
+                }
+                catch (OperationCanceledException)
+                {//swallow and move on..
+                }
+                catch (ObjectDisposedException)
+                {//swallow and move on..
+                }
+                catch (Exception ex)
+                {
+                    ServiceEventSourceMessage($"Exception caught while processing messages:'{ex.Message}'");
+                    //swallow and move on..
+                }
+                finally
+                {
+                    linkedTokenSource.Dispose();
+                }
+                await Task.Delay(Period, cancellationToken);
+            }
+            // ReSharper disable once FunctionNeverReturns
+        }
 
-			await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
-			{
-				var subscribers = await myDictionary.TryGetValueAsync(tx, Subscribers, LockMode.Update);
-				if (subscribers.HasValue)
-				{
-					var newState = BrokerServiceState.RemoveSubscriber(subscribers.Value, reference);
-					await myDictionary.SetAsync(tx, Subscribers, newState);
-				}
+        /// <inheritdoc />
+        protected override IEnumerable<ServiceReplicaListener> CreateServiceReplicaListeners()
+        {
+            //add the pubsub listener
+            yield return new ServiceReplicaListener(context =>
+                new Microsoft.ServiceFabric.Services.Remoting.FabricTransport.Runtime.
+                    FabricTransportServiceRemotingListener(context, this), ListenerName);
+        }
 
+        /// <summary>
+        /// Sends out queued messages for the provided queue.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <param name="subscriber"></param>
+        /// <param name="queueName"></param>
+        /// <returns></returns>
+        protected abstract Task ProcessQueues(CancellationToken cancellationToken, ReferenceWrapper subscriber, string queueName);
 
-				await StateManager.RemoveAsync(tx, queueName);
-				await StateManager.RemoveAsync(tx, deadLetterQueueName);
+        /// <summary>
+        /// Outputs the provided message to the <see cref="ServiceEventSourceMessageCallback" /> if it's configured.
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="caller"></param>
+        protected void ServiceEventSourceMessage(string message, [CallerMemberName] string caller = "unknown")
+        {
+            ServiceEventSourceMessageCallback?.Invoke($"{caller} - {message}");
+        }
 
-				ServiceEventSourceMessage($"Unregistered subscriber: {reference.Name}");
-				_queues.TryRemove(queueName, out reference);
-			});
-		}
+        protected abstract Task CreateQueueAsync(ITransaction tx, string queueName);
 
-		/// <summary>
-		/// Creates a queuename to use for this reference. (message specific)
-		/// </summary>
-		/// <returns></returns>
-		private static string CreateDeadLetterQueueName(ReferenceWrapper reference, string messageTypeName)
-		{
-			return $"{messageTypeName}_{reference.GetDeadLetterQueueName()}";
-		}
+        #endregion Protected Methods
 
-		/// <summary>
-		/// Creates a deadletter queuename to use for this reference. (not message specific)
-		/// </summary>
-		/// <returns></returns>
-		private static string CreateQueueName(ReferenceWrapper reference, string messageTypeName)
-		{
-			return $"{messageTypeName}_{reference.GetQueueName()}";
-		}
-	}
+        #region Private Methods
+
+        /// <summary>
+        /// Creates a queuename to use for this reference. (message specific)
+        /// </summary>
+        /// <returns></returns>
+        private static string CreateDeadLetterQueueName(ReferenceWrapper reference, string messageTypeName)
+        {
+            return $"{messageTypeName}_{reference.GetDeadLetterQueueName()}";
+        }
+
+        /// <summary>
+        /// Creates a deadletter queuename to use for this reference. (not message specific)
+        /// </summary>
+        /// <returns></returns>
+        private static string CreateQueueName(ReferenceWrapper reference, string messageTypeName)
+        {
+            return $"{messageTypeName}_{reference.GetQueueName()}";
+        }
+
+        /// <summary>
+        /// Blocks the calling thread until <see cref="InitializeAsync" /> is complete.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task WaitForInitializeAsync(CancellationToken cancellationToken)
+        {
+            if (_initializer.IsSet) return;
+            await Task.Run(() => InitializeAsync(cancellationToken), cancellationToken);
+            _initializer.Wait(cancellationToken);
+        }
+
+        /// <summary>
+        /// Loads all registered message queues from state and keeps them in memory. Avoids some locks in the statemanager.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task InitializeAsync(CancellationToken cancellationToken)
+        {
+            if (_initializer.IsSet) return;
+            try
+            {
+                _semaphore.Wait(cancellationToken);
+
+                if (_initializer.IsSet) return;
+                await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
+                {
+                    _queues.Clear();
+                    var enumerator = StateManager.GetAsyncEnumerator();
+                    while (await enumerator.MoveNextAsync(cancellationToken))
+                    {
+                        var current = enumerator.Current as IReliableDictionary<string, BrokerServiceState>;
+                        if (current == null) continue;
+
+                        var result = await current.TryGetValueAsync(tx, Subscribers);
+                        if (!result.HasValue) continue;
+
+                        var subscribers = result.Value.Subscribers.ToList();
+                        foreach (var subscriber in subscribers)
+                        {
+                            _queues.TryAdd(subscriber.QueueName, subscriber.ServiceOrActorReference);
+                        }
+                    }
+                }, cancellationToken: cancellationToken);
+                _initializer.Set();
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
+        /// <summary>
+        /// Registers a Service or Actor <paramref name="reference" /> as subscriber for messages of type <paramref name="messageTypeName" />
+        /// </summary>
+        /// <param name="reference">The reference.</param>
+        /// <param name="messageTypeName">Name of the message type.</param>
+        /// <returns>Task.</returns>
+        private async Task RegisterSubscriberAsync(ReferenceWrapper reference, string messageTypeName)
+        {
+            await WaitForInitializeAsync(CancellationToken.None);
+
+            var myDictionary = await TimeoutRetryHelper.Execute((token, state) => StateManager.GetOrAddAsync<IReliableDictionary<string, BrokerServiceState>>(messageTypeName));
+
+            await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
+            {
+                var queueName = CreateQueueName(reference, messageTypeName);
+                var deadLetterQueueName = CreateDeadLetterQueueName(reference, messageTypeName);
+
+                Func<string, BrokerServiceState> addValueFactory = key =>
+                {
+                    Reference subscriber = new Reference(reference, queueName, deadLetterQueueName);
+                    BrokerServiceState newState = new BrokerServiceState(messageTypeName);
+                    newState = BrokerServiceState.AddSubscriber(newState, subscriber);
+                    return newState;
+                };
+
+                Func<string, BrokerServiceState, BrokerServiceState> updateValueFactory = (key, current) =>
+                {
+                    Reference subscriber = new Reference(reference, queueName, deadLetterQueueName);
+                    BrokerServiceState newState = BrokerServiceState.AddSubscriber(current, subscriber);
+                    return newState;
+                };
+
+                await myDictionary.AddOrUpdateAsync(tx, Subscribers, addValueFactory, updateValueFactory);
+
+                await CreateQueueAsync(tx, queueName);
+                await CreateQueueAsync(tx, deadLetterQueueName);
+
+                _queues.AddOrUpdate(queueName, reference, (key, old) => reference);
+                ServiceEventSourceMessage($"Registered subscriber: {reference.Name}");
+            }, cancellationToken: CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Unregisters a Service or Actor <paramref name="reference" /> as subscriber for messages of type <paramref name="messageTypeName" />
+        /// </summary>
+        /// <param name="reference"></param>
+        /// <param name="messageTypeName"></param>
+        /// <returns></returns>
+        private async Task UnregisterSubscriberAsync(ReferenceWrapper reference, string messageTypeName)
+        {
+            await WaitForInitializeAsync(CancellationToken.None);
+
+            var myDictionary = await TimeoutRetryHelper.Execute((token, state) => StateManager.GetOrAddAsync<IReliableDictionary<string, BrokerServiceState>>(messageTypeName));
+            var queueName = CreateQueueName(reference, messageTypeName);
+            var deadLetterQueueName = CreateDeadLetterQueueName(reference, messageTypeName);
+
+            await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
+            {
+                var subscribers = await myDictionary.TryGetValueAsync(tx, Subscribers, LockMode.Update);
+                if (subscribers.HasValue)
+                {
+                    var newState = BrokerServiceState.RemoveSubscriber(subscribers.Value, reference);
+                    await myDictionary.SetAsync(tx, Subscribers, newState);
+                }
+
+                await StateManager.RemoveAsync(tx, queueName);
+                await StateManager.RemoveAsync(tx, deadLetterQueueName);
+
+                ServiceEventSourceMessage($"Unregistered subscriber: {reference.Name}");
+                _queues.TryRemove(queueName, out reference);
+            });
+        }
+
+        #endregion Private Methods
+    }
 }

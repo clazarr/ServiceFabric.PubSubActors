@@ -4,86 +4,91 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.ServiceFabric.Data;
 using Microsoft.ServiceFabric.Data.Collections;
-using Microsoft.ServiceFabric.Services.Runtime;
 using ServiceFabric.PubSubActors.Interfaces;
-using ServiceFabric.PubSubActors.PublisherActors;
 using ServiceFabric.PubSubActors.State;
-using ServiceFabric.PubSubActors.SubscriberServices;
 
 namespace ServiceFabric.PubSubActors
 {
-	/// <remarks>
-	/// Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages 
-	/// from Actors & Services calling <see cref="PublisherActorExtensions.PublishMessageAsync"/>
-	/// and forwards them to <see cref="ISubscriberActor"/> Actors and <see cref="ISubscriberService"/> Services without strict ordering, so more performant than <see cref="BrokerService"/>.
-	/// Every message type is mapped to one of the partitions of this service.
-	/// </remarks>
-	public abstract class BrokerServiceUnordered : BrokerServiceBase
-	{
-		/// <summary>
-		/// Creates a new instance using the provided context and registers this instance for automatic discovery if needed.
-		/// </summary>
-		/// <param name="serviceContext"></param>
-		/// <param name="enableAutoDiscovery"></param>
-		protected BrokerServiceUnordered(StatefulServiceContext serviceContext, bool enableAutoDiscovery = true)
-			: base(serviceContext, enableAutoDiscovery)
-		{
-		}
+    /// <remarks>
+    /// Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages from Actors & Services calling 
+    /// <see cref="PublisherActorExtensions.PublishMessageAsync"/> and forwards them to <see cref="ISubscriberActor"/> Actors and 
+    /// <see cref="ISubscriberService"/> Services without strict ordering, so more performant than <see cref="BrokerService"/>. Every 
+    /// message type is mapped to one of the partitions of this service.
+    /// </remarks>
+    public abstract class BrokerServiceUnordered : BrokerServiceBase
+    {
+        #region Protected Constructors
 
-		/// <summary>
-		/// Creates a new instance using the provided context and registers this instance for automatic discovery if needed.
-		/// </summary>
-		/// <param name="serviceContext"></param>
-		/// <param name="reliableStateManagerReplica"></param>
-		/// <param name="enableAutoDiscovery"></param>
-		protected BrokerServiceUnordered(StatefulServiceContext serviceContext, IReliableStateManagerReplica reliableStateManagerReplica, bool enableAutoDiscovery = true)
-			: base(serviceContext, reliableStateManagerReplica, enableAutoDiscovery)
-		{
-		}
+        /// <summary>
+        /// Creates a new instance using the provided context and registers this instance for automatic discovery if needed.
+        /// </summary>
+        /// <param name="serviceContext"></param>
+        /// <param name="enableAutoDiscovery"></param>
+        protected BrokerServiceUnordered(StatefulServiceContext serviceContext, bool enableAutoDiscovery = true)
+            : base(serviceContext, enableAutoDiscovery)
+        {
+        }
 
-		/// <summary>
-		/// Sends out queued messages for the provided queue.
-		/// </summary>
-		/// <param name="cancellationToken"></param>
-		/// <param name="subscriber"></param>
-		/// <param name="queueName"></param>
-		/// <returns></returns>
-		protected sealed override async Task ProcessQueues(CancellationToken cancellationToken, ReferenceWrapper subscriber, string queueName)
-		{
-			var queue = await TimeoutRetryHelper.Execute((token, state) => StateManager.GetOrAddAsync<IReliableConcurrentQueue<MessageWrapper>>(queueName), cancellationToken: cancellationToken);
-			long messageCount = queue.Count;
+        /// <summary>
+        /// Creates a new instance using the provided context and registers this instance for automatic discovery if needed.
+        /// </summary>
+        /// <param name="serviceContext"></param>
+        /// <param name="reliableStateManagerReplica"></param>
+        /// <param name="enableAutoDiscovery"></param>
+        protected BrokerServiceUnordered(StatefulServiceContext serviceContext, IReliableStateManagerReplica reliableStateManagerReplica, bool enableAutoDiscovery = true)
+            : base(serviceContext, reliableStateManagerReplica, enableAutoDiscovery)
+        {
+        }
 
-			if (messageCount == 0L) return;
-			messageCount = Math.Min(messageCount, MaxDequeuesInOneIteration);
+        #endregion Protected Constructors
 
-			ServiceEventSourceMessage($"Processing {messageCount} items from queue {queue.Name} for subscriber: {subscriber.Name}");
+        #region Protected Methods
 
-			for (long i = 0; i < messageCount; i++)
-			{
-				cancellationToken.ThrowIfCancellationRequested();
+        /// <summary>
+        /// Sends out queued messages for the provided queue.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <param name="subscriber"></param>
+        /// <param name="queueName"></param>
+        /// <returns></returns>
+        protected sealed override async Task ProcessQueues(CancellationToken cancellationToken, ReferenceWrapper subscriber, string queueName)
+        {
+            var queue = await TimeoutRetryHelper.Execute((token, state) => StateManager.GetOrAddAsync<IReliableConcurrentQueue<MessageWrapper>>(queueName), cancellationToken: cancellationToken);
+            long messageCount = queue.Count;
 
-				await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
-				{
-					var result = await queue.TryDequeueAsync(tx, cancellationToken);
-					if (result.HasValue)
-					{
-						await subscriber.PublishAsync(result.Value);
-					}
-				}, cancellationToken: cancellationToken);
-			}
-		}
+            if (messageCount == 0L) return;
+            messageCount = Math.Min(messageCount, MaxDequeuesInOneIteration);
 
-		protected override async Task EnqueueMessageAsync(MessageWrapper message, Reference subscriber, ITransaction tx)
-		{
-			var queueResult = await StateManager.TryGetAsync<IReliableConcurrentQueue<MessageWrapper>>(subscriber.QueueName);
-			if (!queueResult.HasValue) return;
+            ServiceEventSourceMessage($"Processing {messageCount} items from queue {queue.Name} for subscriber: {subscriber.Name}");
 
-			await queueResult.Value.EnqueueAsync(tx, message);
-		}
+            for (long i = 0; i < messageCount; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
 
-		protected sealed override Task CreateQueueAsync(ITransaction tx, string queueName)
-		{
-			return StateManager.GetOrAddAsync<IReliableConcurrentQueue<MessageWrapper>>(tx, queueName);
-		}
-	}
+                await TimeoutRetryHelper.ExecuteInTransaction(StateManager, async (tx, token, state) =>
+                {
+                    ConditionalValue<MessageWrapper> message = await queue.TryDequeueAsync(tx, cancellationToken);
+                    if (message.HasValue)
+                    {
+                        await subscriber.PublishAsync(message.Value);
+                    }
+                }, cancellationToken: cancellationToken);
+            }
+        }
+
+        protected override async Task EnqueueMessageAsync(MessageWrapper message, Reference subscriber, ITransaction tx)
+        {
+            var queueResult = await StateManager.TryGetAsync<IReliableConcurrentQueue<MessageWrapper>>(subscriber.QueueName);
+            if (!queueResult.HasValue) return;
+
+            await queueResult.Value.EnqueueAsync(tx, message);
+        }
+
+        protected sealed override Task CreateQueueAsync(ITransaction tx, string queueName)
+        {
+            return StateManager.GetOrAddAsync<IReliableConcurrentQueue<MessageWrapper>>(tx, queueName);
+        }
+
+        #endregion Protected Methods
+    }
 }

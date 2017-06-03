@@ -11,6 +11,7 @@ It uses extension methods to
 
 ## Release notes:
 
+- 7.0.1 Changed IPayloadSerializer and default implementation to use generics (breaks compatibility from 6.0.x). Added support for simple message correlation to filter publication to matching subscriber(s). Useful for messaging between parent and child actor/service instances where correlating a specific message back to a specific subscriber is needed for a given message type.
 - 7.0.0 upgraded to new sdk (2.6.210) and VS2017
 - 6.0.3 Add experimental support for IReliableConcurrentQueue, using `BrokerServiceUnordered`. Used in the LoadDemo app.
 - 5.1.0 Add custom serialization option for kotvisbj

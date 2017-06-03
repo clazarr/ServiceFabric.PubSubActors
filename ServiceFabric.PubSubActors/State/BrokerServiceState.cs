@@ -1,21 +1,28 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.Serialization;
-using System.Collections.Immutable;
 
 namespace ServiceFabric.PubSubActors.State
 {
     [DataContract]
     internal sealed class BrokerServiceState
     {
-        private static readonly IEnumerable<Reference> Empty = ImmutableList<Reference>.Empty;
+        #region Public Fields
 
         [DataMember]
         public readonly string MessageTypeName;
 
-        [DataMember]
-        public IEnumerable<Reference> Subscribers { get; private set; }
+        #endregion Public Fields
+
+        #region Private Fields
+
+        private static readonly IEnumerable<Reference> Empty = ImmutableList<Reference>.Empty;
+
+        #endregion Private Fields
+
+        #region Public Constructors
 
         public BrokerServiceState(string messageTypeName, IEnumerable<Reference> subscribers = null)
         {
@@ -23,15 +30,19 @@ namespace ServiceFabric.PubSubActors.State
             Subscribers = subscribers != null ? subscribers.ToImmutableList() : Empty;
         }
 
-        [OnDeserialized]
-        private void OnDeserialized(StreamingContext context)
-        {
-            // Convert the deserialized collection to an immutable collection
-            Subscribers = Subscribers.ToImmutableList();
-        }
+        #endregion Public Constructors
+
+        #region Public Properties
+
+        [DataMember]
+        public IEnumerable<Reference> Subscribers { get; private set; }
+
+        #endregion Public Properties
+
+        #region Public Methods
 
         /// <summary>
-        /// Returns a cloned instance with the same subscribers as the original, plus the new <paramref name="subscriber"/>
+        /// Returns a cloned instance with the same subscribers as the original, plus the new <paramref name="subscriber" />
         /// </summary>
         /// <param name="current"></param>
         /// <param name="subscriber"></param>
@@ -50,7 +61,7 @@ namespace ServiceFabric.PubSubActors.State
         }
 
         /// <summary>
-        /// Returns a cloned instance with the same subscribers as the original, minus the new <paramref name="subscriber"/>
+        /// Returns a cloned instance with the same subscribers as the original, minus the new <paramref name="subscriber" />
         /// </summary>
         /// <param name="current"></param>
         /// <param name="subscriber"></param>
@@ -63,7 +74,7 @@ namespace ServiceFabric.PubSubActors.State
         }
 
         /// <summary>
-        /// Returns a cloned instance with the same subscribers as the original, minus the new <paramref name="subscriber"/>
+        /// Returns a cloned instance with the same subscribers as the original, minus the new <paramref name="subscriber" />
         /// </summary>
         /// <param name="current"></param>
         /// <param name="subscriber"></param>
@@ -81,23 +92,18 @@ namespace ServiceFabric.PubSubActors.State
             var clone = new BrokerServiceState(current.MessageTypeName, ((ImmutableList<Reference>)current.Subscribers).RemoveAll(s => s.ServiceOrActorReference.Equals(subscriber)));
             return clone;
         }
-    }
 
-    [DataContract]
-    public class Reference
-    {
-        [DataMember]
-        public ReferenceWrapper ServiceOrActorReference { get; private set; }
+        #endregion Public Methods
 
-        [DataMember] public readonly string QueueName;
+        #region Private Methods
 
-        [DataMember] public readonly string DeadLetterQueueName;
-
-        public Reference(ReferenceWrapper serviceOrActorReference, string queueName, string deadLetterQueueName)
+        [OnDeserialized]
+        private void OnDeserialized(StreamingContext context)
         {
-            ServiceOrActorReference = serviceOrActorReference;
-            QueueName = queueName;
-            DeadLetterQueueName = deadLetterQueueName;
+            // Convert the deserialized collection to an immutable collection
+            Subscribers = Subscribers.ToImmutableList();
         }
+
+        #endregion Private Methods
     }
 }

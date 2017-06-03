@@ -9,7 +9,13 @@ namespace ServiceFabric.PubSubActors.Helpers
 {
     public class SubscriberServiceHelper : ISubscriberServiceHelper
     {
+        #region Private Fields
+
         private readonly IBrokerServiceLocator _brokerServiceLocator;
+
+        #endregion Private Fields
+
+        #region Public Constructors
 
         public SubscriberServiceHelper()
         {
@@ -21,18 +27,27 @@ namespace ServiceFabric.PubSubActors.Helpers
             _brokerServiceLocator = brokerServiceLocator;
         }
 
+        #endregion Public Constructors
+
+        #region Public Methods
+
         /// <summary>
-        /// Registers this Actor as a subscriber for messages of type <paramref name="messageType"/> with the <see cref="BrokerService"/>.
+        /// Registers this stateless service as a subscriber for messages of type <paramref name="messageType" /> with the <see cref="BrokerService" />.
         /// </summary>
-        /// <returns></returns>
-        public async Task RegisterMessageTypeAsync(StatelessService service, Type messageType,
-            Uri brokerServiceName = null)
+        /// <param name="service">The service.</param>
+        /// <param name="messageType">Type of the message.</param>
+        /// <param name="brokerServiceName">Name of the broker service.</param>
+        /// <param name="correlationId">The optional correlation identifier to associate with this message.</param>
+        /// <returns>Task.</returns>
+        /// <exception cref="System.ArgumentNullException">service or messageType</exception>
+        /// <exception cref="System.InvalidOperationException">No brokerServiceName was provided or discovered in the current application.</exception>
+        public async Task RegisterMessageTypeAsync(StatelessService service, Type messageType, Uri brokerServiceName = null, string correlationId = null)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             if (messageType == null) throw new ArgumentNullException(nameof(messageType));
             if (brokerServiceName == null)
             {
-                brokerServiceName = await PublisherServiceHelper.DiscoverBrokerServiceNameAsync();
+                brokerServiceName = await PublisherServiceHelper.DiscoverBrokerServiceNameAsync(this._brokerServiceLocator);
                 if (brokerServiceName == null)
                 {
                     throw new InvalidOperationException(
@@ -42,21 +57,33 @@ namespace ServiceFabric.PubSubActors.Helpers
             var brokerService =
                 await _brokerServiceLocator.GetBrokerServiceForMessageAsync(messageType.Name, brokerServiceName);
             var serviceReference = CreateServiceReference(service.Context, GetServicePartition(service).PartitionInfo);
-            await brokerService.RegisterServiceSubscriberAsync(serviceReference, messageType.FullName);
+            if (correlationId == null)
+            {
+                await brokerService.RegisterServiceSubscriberAsync(serviceReference, messageType.FullName);
+            }
+            else
+            {
+                await brokerService.RegisterCorrelatedServiceSubscriberAsync(serviceReference, messageType.FullName, correlationId);
+            }
         }
 
         /// <summary>
-        /// Unregisters this Actor as a subscriber for messages of type <paramref name="messageType"/> with the <see cref="BrokerService"/>.
+        /// Unregisters this stateless service as a subscriber for messages of type <paramref name="messageType" /> with the <see cref="BrokerService" />.
         /// </summary>
-        /// <returns></returns>
-        public async Task UnregisterMessageTypeAsync(StatelessService service, Type messageType, bool flushQueue,
-            Uri brokerServiceName = null)
+        /// <param name="service">The service.</param>
+        /// <param name="messageType">Type of the message.</param>
+        /// <param name="flushQueue">if set to <c>true</c> [flush queue].</param>
+        /// <param name="brokerServiceName">Name of the broker service.</param>
+        /// <returns>Task.</returns>
+        /// <exception cref="System.ArgumentNullException">service or messageType</exception>
+        /// <exception cref="System.InvalidOperationException">No brokerServiceName was provided or discovered in the current application.</exception>
+        public async Task UnregisterMessageTypeAsync(StatelessService service, Type messageType, bool flushQueue, Uri brokerServiceName = null)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             if (messageType == null) throw new ArgumentNullException(nameof(messageType));
             if (brokerServiceName == null)
             {
-                brokerServiceName = await PublisherServiceHelper.DiscoverBrokerServiceNameAsync();
+                brokerServiceName = await PublisherServiceHelper.DiscoverBrokerServiceNameAsync(this._brokerServiceLocator);
                 if (brokerServiceName == null)
                 {
                     throw new InvalidOperationException(
@@ -70,11 +97,16 @@ namespace ServiceFabric.PubSubActors.Helpers
         }
 
         /// <summary>
-        /// Registers this Actor as a subscriber for messages of type <paramref name="messageType"/> with the <see cref="BrokerService"/>.
+        /// Registers this stateful service as a subscriber for messages of type <paramref name="messageType" /> with the <see cref="BrokerService" />.
         /// </summary>
-        /// <returns></returns>
-        public async Task RegisterMessageTypeAsync(StatefulService service, Type messageType,
-            Uri brokerServiceName = null)
+        /// <param name="service">The service.</param>
+        /// <param name="messageType">Type of the message.</param>
+        /// <param name="brokerServiceName">Name of the broker service.</param>
+        /// <param name="correlationId">The optional correlation identifier to associate with this message.</param>
+        /// <returns>Task.</returns>
+        /// <exception cref="System.ArgumentNullException">service or messageType</exception>
+        /// <exception cref="System.InvalidOperationException">No brokerServiceName was provided or discovered in the current application.</exception>
+        public async Task RegisterMessageTypeAsync(StatefulService service, Type messageType, Uri brokerServiceName = null, string correlationId = null)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             if (messageType == null) throw new ArgumentNullException(nameof(messageType));
@@ -90,15 +122,27 @@ namespace ServiceFabric.PubSubActors.Helpers
             var brokerService =
                 await _brokerServiceLocator.GetBrokerServiceForMessageAsync(messageType.Name, brokerServiceName);
             var serviceReference = CreateServiceReference(service.Context, GetServicePartition(service).PartitionInfo);
-            await brokerService.RegisterServiceSubscriberAsync(serviceReference, messageType.FullName);
+            if (correlationId == null)
+            {
+                await brokerService.RegisterServiceSubscriberAsync(serviceReference, messageType.FullName);
+            }
+            else
+            {
+                await brokerService.RegisterCorrelatedServiceSubscriberAsync(serviceReference, messageType.FullName, correlationId);
+            }
         }
 
         /// <summary>
-        /// Unregisters this Actor as a subscriber for messages of type <paramref name="messageType"/> with the <see cref="BrokerService"/>.
+        /// Unregisters this stateful service as a subscriber for messages of type <paramref name="messageType" /> with the <see cref="BrokerService" />.
         /// </summary>
-        /// <returns></returns>
-        public async Task UnregisterMessageTypeAsync(StatefulService service, Type messageType, bool flushQueue,
-            Uri brokerServiceName = null)
+        /// <param name="service">The service.</param>
+        /// <param name="messageType">Type of the message.</param>
+        /// <param name="flushQueue">if set to <c>true</c> [flush queue].</param>
+        /// <param name="brokerServiceName">Name of the broker service.</param>
+        /// <returns>Task.</returns>
+        /// <exception cref="System.ArgumentNullException">service or messageType</exception>
+        /// <exception cref="System.InvalidOperationException">No brokerServiceName was provided or discovered in the current application.</exception>
+        public async Task UnregisterMessageTypeAsync(StatefulService service, Type messageType, bool flushQueue, Uri brokerServiceName = null)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             if (messageType == null) throw new ArgumentNullException(nameof(messageType));
@@ -117,19 +161,9 @@ namespace ServiceFabric.PubSubActors.Helpers
             await brokerService.UnregisterServiceSubscriberAsync(serviceReference, messageType.FullName, flushQueue);
         }
 
-        /// <summary>
-        /// Gets the Partition info for the provided StatefulServiceBase instance.
-        /// </summary>
-        /// <param name="serviceBase"></param>
-        /// <returns></returns>
-        private IStatefulServicePartition GetServicePartition(StatefulServiceBase serviceBase)
-        {
-            if (serviceBase == null) throw new ArgumentNullException(nameof(serviceBase));
-            return (IStatefulServicePartition) serviceBase
-                .GetType()
-                .GetProperty("Partition", BindingFlags.Instance | BindingFlags.NonPublic)
-                .GetValue(serviceBase);
-        }
+        #endregion Public Methods
+
+        #region Private Methods
 
         /// <summary>
         /// Gets the Partition info for the provided StatelessService instance.
@@ -139,15 +173,14 @@ namespace ServiceFabric.PubSubActors.Helpers
         private static IStatelessServicePartition GetServicePartition(StatelessService serviceBase)
         {
             if (serviceBase == null) throw new ArgumentNullException(nameof(serviceBase));
-            return (IStatelessServicePartition) serviceBase
+            return (IStatelessServicePartition)serviceBase
                 .GetType()
                 .GetProperty("Partition", BindingFlags.Instance | BindingFlags.NonPublic)
                 .GetValue(serviceBase);
         }
-        
-        
+
         /// <summary>
-        /// Creates a <see cref="ServiceReference"/> for the provided service context and partition info.
+        /// Creates a <see cref="ServiceReference" /> for the provided service context and partition info.
         /// </summary>
         /// <param name="context"></param>
         /// <param name="info"></param>
@@ -178,5 +211,21 @@ namespace ServiceFabric.PubSubActors.Helpers
             }
             return serviceReference;
         }
+
+        /// <summary>
+        /// Gets the Partition info for the provided StatefulServiceBase instance.
+        /// </summary>
+        /// <param name="serviceBase"></param>
+        /// <returns></returns>
+        private IStatefulServicePartition GetServicePartition(StatefulServiceBase serviceBase)
+        {
+            if (serviceBase == null) throw new ArgumentNullException(nameof(serviceBase));
+            return (IStatefulServicePartition)serviceBase
+                .GetType()
+                .GetProperty("Partition", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(serviceBase);
+        }
+
+        #endregion Private Methods
     }
 }

@@ -6,32 +6,48 @@ namespace ServiceFabric.PubSubActors.Helpers
 {
     public interface ISubscriberServiceHelper
     {
-        /// <summary>
-        /// Registers this Actor as a subscriber for messages of type <paramref name="messageType"/> with the <see cref="BrokerService"/>.
-        /// </summary>
-        /// <returns></returns>
-        Task RegisterMessageTypeAsync(StatelessService service, Type messageType,
-            Uri brokerServiceName = null);
+        #region Public Methods
 
         /// <summary>
-        /// Unregisters this Actor as a subscriber for messages of type <paramref name="messageType"/> with the <see cref="BrokerService"/>.
+        /// Registers this stateless service as a subscriber for messages of type <paramref name="messageType" /> with the <see cref="BrokerService" />.
         /// </summary>
-        /// <returns></returns>
-        Task UnregisterMessageTypeAsync(StatelessService service, Type messageType, bool flushQueue,
-            Uri brokerServiceName = null);
+        /// <param name="service">The service.</param>
+        /// <param name="messageType">Type of the message.</param>
+        /// <param name="brokerServiceName">Name of the broker service.</param>
+        /// <param name="correlationId">The optional correlation identifier to associate with this message.</param>
+        /// <returns>Task.</returns>
+        Task RegisterMessageTypeAsync(StatelessService service, Type messageType, Uri brokerServiceName = null, string correlationId = null);
 
         /// <summary>
-        /// Registers this Actor as a subscriber for messages of type <paramref name="messageType"/> with the <see cref="BrokerService"/>.
+        /// Unregisters this stateless service as a subscriber for messages of type <paramref name="messageType" /> with the <see cref="BrokerService" />.
         /// </summary>
-        /// <returns></returns>
-        Task RegisterMessageTypeAsync(StatefulService service, Type messageType,
-            Uri brokerServiceName = null);
+        /// <param name="service">The service.</param>
+        /// <param name="messageType">Type of the message.</param>
+        /// <param name="flushQueue">if set to <c>true</c> [flush queue].</param>
+        /// <param name="brokerServiceName">Name of the broker service.</param>
+        /// <returns>Task.</returns>
+        Task UnregisterMessageTypeAsync(StatelessService service, Type messageType, bool flushQueue, Uri brokerServiceName = null);
 
         /// <summary>
-        /// Unregisters this Actor as a subscriber for messages of type <paramref name="messageType"/> with the <see cref="BrokerService"/>.
+        /// Registers this stateful service as a subscriber for messages of type <paramref name="messageType" /> with the <see cref="BrokerService" />.
         /// </summary>
-        /// <returns></returns>
-        Task UnregisterMessageTypeAsync(StatefulService service, Type messageType, bool flushQueue,
-            Uri brokerServiceName = null);
+        /// <param name="service">The service.</param>
+        /// <param name="messageType">Type of the message.</param>
+        /// <param name="brokerServiceName">Name of the broker service.</param>
+        /// <param name="correlationId">The optional correlation identifier to associate with this message.</param>
+        /// <returns>Task.</returns>
+        Task RegisterMessageTypeAsync(StatefulService service, Type messageType, Uri brokerServiceName = null, string correlationId = null);
+
+        /// <summary>
+        /// Unregisters this stateful service as a subscriber for messages of type <paramref name="messageType" /> with the <see cref="BrokerService" />.
+        /// </summary>
+        /// <param name="service">The service.</param>
+        /// <param name="messageType">Type of the message.</param>
+        /// <param name="flushQueue">if set to <c>true</c> [flush queue].</param>
+        /// <param name="brokerServiceName">Name of the broker service.</param>
+        /// <returns>Task.</returns>
+        Task UnregisterMessageTypeAsync(StatefulService service, Type messageType, bool flushQueue, Uri brokerServiceName = null);
+
+        #endregion Public Methods
     }
 }
