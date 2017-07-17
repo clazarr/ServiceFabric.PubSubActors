@@ -9,8 +9,16 @@ It uses extension methods to
 - StatelessService
 - StatefulService
 
+## Contribute!
+Contributions are welcome.
+Please upgrade the package version with a minor tick if there are no breaking changes. And add a line to the readme.md, stating the changes, e.g. 'upgraded to SF version x.y.z'.
+Doing so will allow me to simply accept the PR, which will automatically trigger the release of a new package.
+Please also make sure all feature additions have a corresponding unit test.
+
 ## Release notes:
 
+- 7.1.1 Ensure TimeoutRetryHelper.Execute uses maxAttempts parameter instead of (only) hardcoded DefaultMaxAttempts. Make Publish methods on publisher helpers virtual to support extension in derived classes.
+- 7.1.0 upgraded to new sdk (2.6.220)
 - 7.0.1 Changed IPayloadSerializer and default implementation to use generics (breaks compatibility from 6.0.x). Added support for simple message correlation to filter publication to matching subscriber(s). Useful for messaging between parent and child actor/service instances where correlating a specific message back to a specific subscriber is needed for a given message type.
 - 7.0.0 upgraded to new sdk (2.6.210) and VS2017
 - 6.0.3 Add experimental support for IReliableConcurrentQueue, using `BrokerServiceUnordered`. Used in the LoadDemo app.
