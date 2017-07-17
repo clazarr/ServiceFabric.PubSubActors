@@ -43,7 +43,7 @@ namespace ServiceFabric.PubSubActors.Helpers
         /// <returns>Task.</returns>
         /// <exception cref="System.ArgumentNullException">actor or message</exception>
         /// <exception cref="System.InvalidOperationException">No brokerServiceName was provided or discovered in the current application.</exception>
-        public async Task PublishMessageAsync<TMessage>(ActorBase actor, TMessage message, Uri brokerServiceName = null, string correlationId = null)
+        public async virtual Task PublishMessageAsync<TMessage>(ActorBase actor, TMessage message, Uri brokerServiceName = null, string correlationId = null)
         {
             if (actor == null) throw new ArgumentNullException(nameof(actor));
             if (message == null) throw new ArgumentNullException(nameof(message));

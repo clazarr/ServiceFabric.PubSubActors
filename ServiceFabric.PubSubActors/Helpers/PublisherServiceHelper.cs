@@ -49,7 +49,7 @@ namespace ServiceFabric.PubSubActors.Helpers
         /// <param name="correlationId">The optional correlation identifier to associate with this message.</param>
         /// <returns></returns>
         /// <typeparam name="TMessage">The type of the message to publish.</typeparam>
-        public async Task PublishMessageAsync<TMessage>(StatelessService service, TMessage message, Uri brokerServiceName = null, string correlationId = null)
+        public async virtual Task PublishMessageAsync<TMessage>(StatelessService service, TMessage message, Uri brokerServiceName = null, string correlationId = null)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             if (message == null) throw new ArgumentNullException(nameof(message));
@@ -77,7 +77,7 @@ namespace ServiceFabric.PubSubActors.Helpers
         /// <param name="correlationId">The optional correlation identifier to associate with this message.</param>
         /// <returns></returns>
         /// <typeparam name="TMessage">The type of the message to publish.</typeparam>
-        public async Task PublishMessageAsync<TMessage>(StatefulServiceBase service, TMessage message, Uri brokerServiceName = null, string correlationId = null)
+        public async virtual Task PublishMessageAsync<TMessage>(StatefulServiceBase service, TMessage message, Uri brokerServiceName = null, string correlationId = null)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             if (message == null) throw new ArgumentNullException(nameof(message));

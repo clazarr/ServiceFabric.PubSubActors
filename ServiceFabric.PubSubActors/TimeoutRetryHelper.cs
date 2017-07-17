@@ -6,13 +6,19 @@ using Microsoft.ServiceFabric.Data;
 namespace ServiceFabric.PubSubActors
 {
     /// <summary>
-    /// Provides retry support when using the <see cref="ReliableStateManager"/>.
+    /// Provides retry support when using the <see cref="ReliableStateManager" />.
     /// </summary>
     internal static class TimeoutRetryHelper
     {
+        #region Private Fields
+
         private const int DefaultMaxAttempts = 10;
         private static readonly TimeSpan InitialDelay = TimeSpan.FromMilliseconds(200);
         private static readonly TimeSpan MinimumDelay = TimeSpan.FromMilliseconds(200);
+
+        #endregion Private Fields
+
+        #region Public Methods
 
         /// <summary>
         /// Executes the provided callback in a StateManager transaction, with retry + exponential back-off. Returns the result.
@@ -22,14 +28,14 @@ namespace ServiceFabric.PubSubActors
         /// <param name="operation">Operation to execute with retry.</param>
         /// <param name="state">State passed to callback. (optional)</param>
         /// <param name="cancellationToken">Cancellation support. (optional)</param>
-        /// <param name="maxAttempts">#Attempts to execute <paramref name="operation"/> (optional)</param> 
+        /// <param name="maxAttempts">#Attempts to execute <paramref name="operation" /> (optional)</param>
         /// <param name="initialDelay">First delay between attempts. Later on this will be exponentially grow. (optional)</param>
         /// <returns></returns>
-        public static async Task<TResult> ExecuteInTransaction<TResult>(IReliableStateManager stateManager, 
-            Func<ITransaction, CancellationToken, object, Task<TResult>> operation, 
-            object state = null, 
-            CancellationToken cancellationToken = default(CancellationToken), 
-            int maxAttempts = DefaultMaxAttempts, 
+        public static async Task<TResult> ExecuteInTransaction<TResult>(IReliableStateManager stateManager,
+            Func<ITransaction, CancellationToken, object, Task<TResult>> operation,
+            object state = null,
+            CancellationToken cancellationToken = default(CancellationToken),
+            int maxAttempts = DefaultMaxAttempts,
             TimeSpan? initialDelay = null)
         {
             if (stateManager == null) throw new ArgumentNullException(nameof(stateManager));
@@ -68,10 +74,10 @@ namespace ServiceFabric.PubSubActors
         /// <param name="operation">Operation to execute with retry.</param>
         /// <param name="state">State passed to callback. (optional)</param>
         /// <param name="cancellationToken">Cancellation support. (optional)</param>
-        /// <param name="maxAttempts">#Attempts to execute <paramref name="operation"/> (optional)</param> 
+        /// <param name="maxAttempts">#Attempts to execute <paramref name="operation" /> (optional)</param>
         /// <param name="initialDelay">First delay between attempts. Later on this will be exponentially grow. (optional)</param>
         /// <returns></returns>
-        public static async Task ExecuteInTransaction(IReliableStateManager stateManager, Func<ITransaction, CancellationToken, 
+        public static async Task ExecuteInTransaction(IReliableStateManager stateManager, Func<ITransaction, CancellationToken,
             object, Task> operation,
             object state = null,
             CancellationToken cancellationToken = default(CancellationToken),
@@ -106,17 +112,17 @@ namespace ServiceFabric.PubSubActors
         }
 
         /// <summary>
-        /// Executes the provided callback with retry + exponential back-off for <see cref="TimeoutException"/>.
+        /// Executes the provided callback with retry + exponential back-off for <see cref="TimeoutException" />.
         /// </summary>
         /// <typeparam name="TResult"></typeparam>
         /// <param name="operation">Operation to execute with retry.</param>
         /// <param name="state">State passed to callback. (optional)</param>
         /// <param name="cancellationToken">Cancellation support. (optional)</param>
-        /// <param name="maxAttempts">#Attempts to execute <paramref name="operation"/> (optional)</param> 
+        /// <param name="maxAttempts">#Attempts to execute <paramref name="operation" /> (optional)</param>
         /// <param name="initialDelay">First delay between attempts. Later on this will be exponentially grow. (optional)</param>
         /// <returns></returns>
-        public static async Task<TResult> Execute<TResult>(Func<CancellationToken, object, Task<TResult>> operation, 
-            object state = null, 
+        public static async Task<TResult> Execute<TResult>(Func<CancellationToken, object, Task<TResult>> operation,
+            object state = null,
             CancellationToken cancellationToken = default(CancellationToken),
             int maxAttempts = DefaultMaxAttempts,
             TimeSpan? initialDelay = null)
@@ -136,7 +142,7 @@ namespace ServiceFabric.PubSubActors
                 }
                 catch (TimeoutException)
                 {
-                    if (attempts == DefaultMaxAttempts)
+                    if (attempts + 1 == maxAttempts)
                     {
                         throw;
                     }
@@ -149,5 +155,7 @@ namespace ServiceFabric.PubSubActors
             }
             return result;
         }
+
+        #endregion Public Methods
     }
 }
