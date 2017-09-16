@@ -17,9 +17,11 @@ using ServiceFabric.PubSubActors.State;
 
 namespace ServiceFabric.PubSubActors
 {
-    /// <remarks> Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages from Actors & Services calling <see
-    /// cref="PublisherActorExtensions.PublishMessageAsync"/> and forwards them to <see cref="ISubscriberActor"/> Actors and <see
-    /// cref="ISubscriberService"/> Services. Every message type is mapped to one of the partitions of this service. </remarks>
+    /// <remarks>
+    /// Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages from Actors & Services calling 
+    /// <see cref="PublisherActorExtensions.PublishMessageAsync"/> and forwards them to <see cref="ISubscriberActor"/> Actors and 
+    /// <see cref="ISubscriberService"/> Services. Every message type is mapped to one of the partitions of this service.
+    /// </remarks>
     public abstract class BrokerServiceBase : StatefulService, IBrokerService
     {
         #region Public Fields
@@ -138,9 +140,7 @@ namespace ServiceFabric.PubSubActors
         /// </summary>
         /// <param name="actor">Reference to the actor to register.</param>
         /// <param name="messageTypeName">The full type name of the message to subscribe to.</param>
-        /// <param name="correlationId">
-        /// The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).
-        /// </param>
+        /// <param name="correlationId">The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).</param>
         /// <returns>Task.</returns>
         public async Task RegisterCorrelatedSubscriberAsync(ActorReference actor, string messageTypeName, string correlationId)
         {
@@ -161,21 +161,6 @@ namespace ServiceFabric.PubSubActors
         }
 
         /// <summary>
-        /// Unregisters an Actor as a subscriber for messages that can be correlated to the subscriber.
-        /// </summary>
-        /// <param name="actor">Reference to the actor to unsubscribe.</param>
-        /// <param name="messageTypeName">Full type name of message object.</param>
-        /// <param name="correlationId">
-        /// The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).
-        /// </param>
-        /// <param name="flushQueue">Publish any remaining messages.</param>
-        public async Task UnregisterCorrelatedSubscriberAsync(ActorReference actor, string messageTypeName, string correlationId, bool flushQueue)
-        {
-            var actorReference = new ActorReferenceWrapper(actor, correlationId);
-            await UnregisterSubscriberAsync(actorReference, messageTypeName);
-        }
-
-        /// <summary>
         /// Registers a service as a subscriber for messages.
         /// </summary>
         /// <param name="messageTypeName">Full type name of message object.</param>
@@ -191,9 +176,7 @@ namespace ServiceFabric.PubSubActors
         /// </summary>
         /// <param name="messageTypeName">Full type name of message object.</param>
         /// <param name="service">Reference to the service to register.</param>
-        /// <param name="correlationId">
-        /// The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).
-        /// </param>
+        /// <param name="correlationId">The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).</param>
         public async Task RegisterCorrelatedServiceSubscriberAsync(ServiceReference service, string messageTypeName, string correlationId)
         {
             var serviceReference = new ServiceReferenceWrapper(service, correlationId);
@@ -209,21 +192,6 @@ namespace ServiceFabric.PubSubActors
         public async Task UnregisterServiceSubscriberAsync(ServiceReference service, string messageTypeName, bool flushQueue)
         {
             var serviceReference = new ServiceReferenceWrapper(service);
-            await UnregisterSubscriberAsync(serviceReference, messageTypeName);
-        }
-
-        /// <summary>
-        /// Unregisters a service as a subscriber for messages that can be correlated to the subscriber.
-        /// </summary>
-        /// <param name="messageTypeName">Full type name of message object.</param>
-        /// <param name="service">Reference to the actor to unsubscribe.</param>
-        /// <param name="correlationId">
-        /// The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).
-        /// </param>
-        /// <param name="flushQueue">Publish any remaining messages.</param>
-        public async Task UnregisterCorrelatedServiceSubscriberAsync(ServiceReference service, string messageTypeName, string correlationId, bool flushQueue)
-        {
-            var serviceReference = new ServiceReferenceWrapper(service, correlationId);
             await UnregisterSubscriberAsync(serviceReference, messageTypeName);
         }
 

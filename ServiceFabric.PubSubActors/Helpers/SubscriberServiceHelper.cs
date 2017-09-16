@@ -32,13 +32,12 @@ namespace ServiceFabric.PubSubActors.Helpers
         #region Public Methods
 
         /// <summary>
-        /// Registers this stateless service as a subscriber for messages of type <paramref name="messageType" /> with the
-        /// <see cref="BrokerService" />.
+        /// Registers this stateless service as a subscriber for messages of type <paramref name="messageType" /> with the <see cref="BrokerService" />.
         /// </summary>
         /// <param name="service">The service.</param>
         /// <param name="messageType">Type of the message.</param>
         /// <param name="brokerServiceName">Name of the broker service.</param>
-        /// <param name="correlationId">The optional correlation identifier to associate with this message subscriber.</param>
+        /// <param name="correlationId">The optional correlation identifier to associate with this message.</param>
         /// <returns>Task.</returns>
         /// <exception cref="System.ArgumentNullException">service or messageType</exception>
         /// <exception cref="System.InvalidOperationException">No brokerServiceName was provided or discovered in the current application.</exception>
@@ -69,18 +68,16 @@ namespace ServiceFabric.PubSubActors.Helpers
         }
 
         /// <summary>
-        /// Unregisters this stateless service as a subscriber for messages of type <paramref name="messageType" /> with the
-        /// <see cref="BrokerService" />.
+        /// Unregisters this stateless service as a subscriber for messages of type <paramref name="messageType" /> with the <see cref="BrokerService" />.
         /// </summary>
         /// <param name="service">The service.</param>
         /// <param name="messageType">Type of the message.</param>
         /// <param name="flushQueue">if set to <c>true</c> [flush queue].</param>
         /// <param name="brokerServiceName">Name of the broker service.</param>
-        /// <param name="correlationId">The optional correlation identifier to associate with this message subscriber.</param>
         /// <returns>Task.</returns>
         /// <exception cref="System.ArgumentNullException">service or messageType</exception>
         /// <exception cref="System.InvalidOperationException">No brokerServiceName was provided or discovered in the current application.</exception>
-        public async Task UnregisterMessageTypeAsync(StatelessService service, Type messageType, bool flushQueue, Uri brokerServiceName = null, string correlationId = null)
+        public async Task UnregisterMessageTypeAsync(StatelessService service, Type messageType, bool flushQueue, Uri brokerServiceName = null)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             if (messageType == null) throw new ArgumentNullException(nameof(messageType));
@@ -96,14 +93,7 @@ namespace ServiceFabric.PubSubActors.Helpers
             var brokerService =
                 await _brokerServiceLocator.GetBrokerServiceForMessageAsync(messageType.Name, brokerServiceName);
             var serviceReference = CreateServiceReference(service.Context, GetServicePartition(service).PartitionInfo);
-            if (correlationId == null)
-            {
-                await brokerService.UnregisterServiceSubscriberAsync(serviceReference, messageType.FullName, flushQueue);
-            }
-            else
-            {
-                await brokerService.UnregisterCorrelatedServiceSubscriberAsync(serviceReference, messageType.FullName, correlationId, flushQueue);
-            }
+            await brokerService.UnregisterServiceSubscriberAsync(serviceReference, messageType.FullName, flushQueue);
         }
 
         /// <summary>
@@ -112,7 +102,7 @@ namespace ServiceFabric.PubSubActors.Helpers
         /// <param name="service">The service.</param>
         /// <param name="messageType">Type of the message.</param>
         /// <param name="brokerServiceName">Name of the broker service.</param>
-        /// <param name="correlationId">The optional correlation identifier to associate with this message subscriber.</param>
+        /// <param name="correlationId">The optional correlation identifier to associate with this message.</param>
         /// <returns>Task.</returns>
         /// <exception cref="System.ArgumentNullException">service or messageType</exception>
         /// <exception cref="System.InvalidOperationException">No brokerServiceName was provided or discovered in the current application.</exception>
@@ -143,18 +133,16 @@ namespace ServiceFabric.PubSubActors.Helpers
         }
 
         /// <summary>
-        /// Unregisters this stateful service as a subscriber for messages of type <paramref name="messageType" /> with the
-        /// <see cref="BrokerService" />.
+        /// Unregisters this stateful service as a subscriber for messages of type <paramref name="messageType" /> with the <see cref="BrokerService" />.
         /// </summary>
         /// <param name="service">The service.</param>
         /// <param name="messageType">Type of the message.</param>
         /// <param name="flushQueue">if set to <c>true</c> [flush queue].</param>
         /// <param name="brokerServiceName">Name of the broker service.</param>
-        /// <param name="correlationId">The optional correlation identifier to associate with this message subscriber.</param>
         /// <returns>Task.</returns>
         /// <exception cref="System.ArgumentNullException">service or messageType</exception>
         /// <exception cref="System.InvalidOperationException">No brokerServiceName was provided or discovered in the current application.</exception>
-        public async Task UnregisterMessageTypeAsync(StatefulService service, Type messageType, bool flushQueue, Uri brokerServiceName = null, string correlationId = null)
+        public async Task UnregisterMessageTypeAsync(StatefulService service, Type messageType, bool flushQueue, Uri brokerServiceName = null)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             if (messageType == null) throw new ArgumentNullException(nameof(messageType));
@@ -170,14 +158,7 @@ namespace ServiceFabric.PubSubActors.Helpers
             var brokerService =
                 await _brokerServiceLocator.GetBrokerServiceForMessageAsync(messageType.Name, brokerServiceName);
             var serviceReference = CreateServiceReference(service.Context, GetServicePartition(service).PartitionInfo);
-            if (correlationId == null)
-            {
-                await brokerService.UnregisterServiceSubscriberAsync(serviceReference, messageType.FullName, flushQueue);
-            }
-            else
-            {
-                await brokerService.UnregisterCorrelatedServiceSubscriberAsync(serviceReference, messageType.FullName, correlationId, flushQueue);
-            }
+            await brokerService.UnregisterServiceSubscriberAsync(serviceReference, messageType.FullName, flushQueue);
         }
 
         #endregion Public Methods

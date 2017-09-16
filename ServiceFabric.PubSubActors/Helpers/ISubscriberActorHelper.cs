@@ -14,7 +14,7 @@ namespace ServiceFabric.PubSubActors.Helpers
         /// <param name="actor">The actor.</param>
         /// <param name="messageType">Type of the message.</param>
         /// <param name="brokerServiceName">Name of the broker service.</param>
-        /// <param name="correlationId">The optional correlation identifier to associate with this message subscriber.</param>
+        /// <param name="correlationId">The optional correlation identifier to associate with this message.</param>
         /// <returns>Task.</returns>
         Task RegisterMessageTypeAsync(ActorBase actor, Type messageType, Uri brokerServiceName = null, string correlationId = null);
 
@@ -25,9 +25,8 @@ namespace ServiceFabric.PubSubActors.Helpers
         /// <param name="messageType">Type of the message.</param>
         /// <param name="flushQueue">if set to <c>true</c> [flush queue].</param>
         /// <param name="brokerServiceName">Name of the broker service.</param>
-        /// <param name="correlationId">The optional correlation identifier to associate with this message subscriber.</param>
         /// <returns>Task.</returns>
-        Task UnregisterMessageTypeAsync(ActorBase actor, Type messageType, bool flushQueue, Uri brokerServiceName = null, string correlationId = null);
+        Task UnregisterMessageTypeAsync(ActorBase actor, Type messageType, bool flushQueue, Uri brokerServiceName = null);
 
         #endregion Public Methods
     }

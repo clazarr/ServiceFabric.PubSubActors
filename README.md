@@ -17,9 +17,7 @@ Please also make sure all feature additions have a corresponding unit test.
 
 ## Release notes:
 
-- 7.1.3 Included optional CorrelationId property in equality check for ReferenceWrapper derived types ActorReferenceWrapper and ServiceReferenceWrapper to ensure UnregisterSubscriberAsync unregistered the correct registrations when correlation identifiers were used to subscribe (for filtered event subscriptions).
-- 7.1.2 Ensure TimeoutRetryHelper.Execute uses maxAttempts parameter instead of (only) hardcoded DefaultMaxAttempts. Make Publish methods on publisher helpers virtual to support extension in derived classes.
-- 7.1.1 Upgraded nuget packages (SF 2.7.198).
+- 7.1.1 Ensure TimeoutRetryHelper.Execute uses maxAttempts parameter instead of (only) hardcoded DefaultMaxAttempts. Make Publish methods on publisher helpers virtual to support extension in derived classes.
 - 7.1.0 upgraded to new sdk (2.6.220)
 - 7.0.1 Changed IPayloadSerializer and default implementation to use generics (breaks compatibility from 6.0.x). Added support for simple message correlation to filter publication to matching subscriber(s). Useful for messaging between parent and child actor/service instances where correlating a specific message back to a specific subscriber is needed for a given message type.
 - 7.0.0 upgraded to new sdk (2.6.210) and VS2017

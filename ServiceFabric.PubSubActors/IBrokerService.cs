@@ -25,9 +25,7 @@ namespace ServiceFabric.PubSubActors
         /// </summary>
         /// <param name="actor">Reference to the actor to register.</param>
         /// <param name="messageTypeName">The full type name of the message to subscribe to.</param>
-        /// <param name="correlationId">
-        /// The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).
-        /// </param>
+        /// <param name="correlationId">The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).</param>
         /// <returns>Task.</returns>
         [OperationContract]
         Task RegisterCorrelatedSubscriberAsync(ActorReference actor, string messageTypeName, string correlationId);
@@ -42,18 +40,6 @@ namespace ServiceFabric.PubSubActors
         Task UnregisterSubscriberAsync(ActorReference actor, string messageTypeName, bool flushQueue);
 
         /// <summary>
-        /// Unregisters an Actor as a subscriber for messages that can be correlated to the subscriber.
-        /// </summary>
-        /// <param name="messageTypeName">The full type name of the message to subscribe to.</param>
-        /// <param name="actor">Reference to the actor to unregister.</param>
-        /// <param name="correlationId">
-        /// The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).
-        /// </param>
-        /// <param name="flushQueue">Publish any remaining messages.</param>
-        [OperationContract]
-        Task UnregisterCorrelatedSubscriberAsync(ActorReference actor, string messageTypeName, string correlationId, bool flushQueue);
-
-        /// <summary>
         /// Registers a service as a subscriber for messages.
         /// </summary>
         /// <param name="messageTypeName">The full type name of the message to subscribe to.</param>
@@ -66,9 +52,7 @@ namespace ServiceFabric.PubSubActors
         /// </summary>
         /// <param name="service">Reference to the Service to register.</param>
         /// <param name="messageTypeName">The full type name of the message to subscribe to.</param>
-        /// <param name="correlationId">
-        /// The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).
-        /// </param>
+        /// <param name="correlationId">The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).</param>
         /// <returns>Task.</returns>
         [OperationContract]
         Task RegisterCorrelatedServiceSubscriberAsync(Interfaces.ServiceReference service, string messageTypeName, string correlationId);
@@ -81,18 +65,6 @@ namespace ServiceFabric.PubSubActors
         /// <param name="flushQueue">Publish any remaining messages.</param>
         [OperationContract]
         Task UnregisterServiceSubscriberAsync(Interfaces.ServiceReference service, string messageTypeName, bool flushQueue);
-
-        /// <summary>
-        /// Unregisters a service as a subscriber for messages that can be correlated to the subscriber.
-        /// </summary>
-        /// <param name="messageTypeName">The full type name of the message to subscribe to.</param>
-        /// <param name="service">Reference to the Service to unregister.</param>
-        /// <param name="correlationId">
-        /// The correlation identifier to use to match messages to a specific subscriber (i.e., a simple message filter).
-        /// </param>
-        /// <param name="flushQueue">Publish any remaining messages.</param>
-        [OperationContract]
-        Task UnregisterCorrelatedServiceSubscriberAsync(Interfaces.ServiceReference service, string messageTypeName, string correlationId, bool flushQueue);
 
         /// <summary>
         /// Takes a published message and forwards it (indirectly) to all Subscribers.
