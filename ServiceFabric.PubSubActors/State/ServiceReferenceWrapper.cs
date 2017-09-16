@@ -26,13 +26,13 @@ namespace ServiceFabric.PubSubActors.State
         /// Creates a new instance using the provided <see cref="ServiceReference" />.
         /// </summary>
         /// <param name="serviceReference"></param>
-        /// <param name="correlationId">The optional correlation identifier to use to match messages for this service (i.e., a simple message filter).</param>
+        /// <param name="correlationId">
+        /// The optional correlation identifier to use to match messages for this service (i.e., a simple message filter).
+        /// </param>
         public ServiceReferenceWrapper(ServiceReference serviceReference, string correlationId = null)
             : base(correlationId)
         {
-            if (serviceReference == null) throw new ArgumentNullException(nameof(serviceReference));
-
-            ServiceReference = serviceReference;
+            this.ServiceReference = serviceReference ?? throw new ArgumentNullException(nameof(serviceReference));
         }
 
         #endregion Public Constructors
@@ -61,8 +61,8 @@ namespace ServiceFabric.PubSubActors.State
         /// <param name="other">An object to compare with this object.</param>
         public bool Equals(ServiceReferenceWrapper other)
         {
-            if (other?.ServiceReference?.PartitionGuid == null) return false;
-            return Equals(other.ServiceReference.PartitionGuid, ServiceReference.PartitionGuid);
+            if (other.ServiceReference?.PartitionGuid == null) return false;
+            return Equals(other.ServiceReference.PartitionGuid, this.ServiceReference.PartitionGuid) && Equals(other.CorrelationId, this.CorrelationId);
         }
 
         /// <summary>
@@ -83,7 +83,7 @@ namespace ServiceFabric.PubSubActors.State
         public override int GetHashCode()
         {
             // ReSharper disable NonReadonlyMemberInGetHashCode - need to support Serialization.
-            return ServiceReference.PartitionGuid.GetHashCode();
+            return this.ServiceReference.PartitionGuid.GetHashCode();
         }
 
         /// <summary>
