@@ -26,14 +26,16 @@ namespace ServiceFabric.PubSubActors.State
         /// Creates a new instance using the provided <see cref="Microsoft.ServiceFabric.Actors.ActorReference" />.
         /// </summary>
         /// <param name="actorReference"></param>
-        /// <param name="correlationId">The optional correlation identifier to use to match messages for this actor (i.e., a simple message filter).</param>
+        /// <param name="correlationId">
+        /// The optional correlation identifier to use to match messages for this actor (i.e., a simple message filter).
+        /// </param>
         public ActorReferenceWrapper(ActorReference actorReference, string correlationId = null)
             : base(correlationId)
         {
             if (actorReference == null) throw new ArgumentNullException(nameof(actorReference));
             if (actorReference.ActorId == null) throw new ArgumentException(nameof(actorReference.ActorId));
 
-            ActorReference = actorReference;
+            this.ActorReference = actorReference;
         }
 
         #endregion Public Constructors
@@ -63,7 +65,7 @@ namespace ServiceFabric.PubSubActors.State
         public bool Equals(ActorReferenceWrapper other)
         {
             if (other == null) return false;
-            return Equals(other.ActorReference.ActorId, ActorReference.ActorId);
+            return Equals(other.ActorReference.ActorId, this.ActorReference.ActorId) && Equals(other.CorrelationId, this.CorrelationId);
         }
 
         /// <summary>
@@ -84,7 +86,7 @@ namespace ServiceFabric.PubSubActors.State
         public override int GetHashCode()
         {
             // ReSharper disable NonReadonlyMemberInGetHashCode - need to support Serialization.
-            return ActorReference.ActorId.GetHashCode();
+            return this.ActorReference.ActorId.GetHashCode();
         }
 
         /// <summary>
