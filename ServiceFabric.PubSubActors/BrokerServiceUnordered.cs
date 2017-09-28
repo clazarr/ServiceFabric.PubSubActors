@@ -9,12 +9,10 @@ using ServiceFabric.PubSubActors.State;
 
 namespace ServiceFabric.PubSubActors
 {
-    /// <remarks>
-    /// Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages from Actors & Services calling 
-    /// <see cref="PublisherActorExtensions.PublishMessageAsync"/> and forwards them to <see cref="ISubscriberActor"/> Actors and 
-    /// <see cref="ISubscriberService"/> Services without strict ordering, so more performant than <see cref="BrokerService"/>. Every 
-    /// message type is mapped to one of the partitions of this service.
-    /// </remarks>
+    /// <remarks> Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages from Actors & Services calling <see
+    /// cref="PublisherActorExtensions.PublishMessageAsync"/> and forwards them to <see cref="ISubscriberActor"/> Actors and <see
+    /// cref="ISubscriberService"/> Services without strict ordering, so more performant than <see cref="BrokerService"/>. Every message type is mapped
+    /// to one of the partitions of this service. </remarks>
     public abstract class BrokerServiceUnordered : BrokerServiceBase
     {
         #region Protected Constructors
@@ -35,7 +33,7 @@ namespace ServiceFabric.PubSubActors
         /// <param name="serviceContext"></param>
         /// <param name="reliableStateManagerReplica"></param>
         /// <param name="enableAutoDiscovery"></param>
-        protected BrokerServiceUnordered(StatefulServiceContext serviceContext, IReliableStateManagerReplica reliableStateManagerReplica, bool enableAutoDiscovery = true)
+        protected BrokerServiceUnordered(StatefulServiceContext serviceContext, IReliableStateManagerReplica2 reliableStateManagerReplica, bool enableAutoDiscovery = true)
             : base(serviceContext, reliableStateManagerReplica, enableAutoDiscovery)
         {
         }

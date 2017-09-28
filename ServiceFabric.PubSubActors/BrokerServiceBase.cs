@@ -10,6 +10,7 @@ using Microsoft.ServiceFabric.Actors;
 using Microsoft.ServiceFabric.Data;
 using Microsoft.ServiceFabric.Data.Collections;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
+using Microsoft.ServiceFabric.Services.Remoting.V2.FabricTransport.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
 using ServiceFabric.PubSubActors.Helpers;
 using ServiceFabric.PubSubActors.Interfaces;
@@ -77,7 +78,7 @@ namespace ServiceFabric.PubSubActors
         /// <param name="reliableStateManagerReplica"></param>
         /// <param name="enableAutoDiscovery"></param>
         protected BrokerServiceBase(StatefulServiceContext serviceContext,
-            IReliableStateManagerReplica reliableStateManagerReplica, bool enableAutoDiscovery = true)
+            IReliableStateManagerReplica2 reliableStateManagerReplica, bool enableAutoDiscovery = true)
             : base(serviceContext, reliableStateManagerReplica)
         {
             if (enableAutoDiscovery)
@@ -330,9 +331,7 @@ namespace ServiceFabric.PubSubActors
         protected override IEnumerable<ServiceReplicaListener> CreateServiceReplicaListeners()
         {
             //add the pubsub listener
-            yield return new ServiceReplicaListener(context =>
-                new Microsoft.ServiceFabric.Services.Remoting.FabricTransport.Runtime.
-                    FabricTransportServiceRemotingListener(context, this), ListenerName);
+            yield return new ServiceReplicaListener(context => new FabricTransportServiceRemotingListener(context, this), ListenerName);
         }
 
         /// <summary>
