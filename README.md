@@ -17,6 +17,8 @@ Please also make sure all feature additions have a corresponding unit test.
 
 ## Release notes:
 
+- 7.2.0 Upgraded nuget packages (SF 2.8.219)
+- 7.1.1 Upgraded nuget packages (SF 2.7.198)
 - 7.1.4 Upgraded nuget packages (SF 2.8.211).
 - 7.1.3 Included optional CorrelationId property in equality check for ReferenceWrapper derived types ActorReferenceWrapper and ServiceReferenceWrapper to ensure UnregisterSubscriberAsync unregistered the correct registrations when correlation identifiers were used to subscribe (for filtered event subscriptions).
 - 7.1.2 Ensure TimeoutRetryHelper.Execute uses maxAttempts parameter instead of (only) hardcoded DefaultMaxAttempts. Make Publish methods on publisher helpers virtual to support extension in derived classes.

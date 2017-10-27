@@ -14,11 +14,14 @@ namespace ServiceFabric.PubSubActors
     /// cref="ISubscriberService"/> Services with strict ordering, so less performant than <see cref="BrokerServiceUnordered"/>. Every message type is
     /// mapped to one of the partitions of this service. </remarks>
     public abstract class BrokerService : BrokerServiceBase
-    {/// <summary>
+    {
         #region Protected Constructors
 
-        /// Creates a new instance using the provided context and registers this instance for automatic discovery if needed. </summary> <param
-        /// name="serviceContext"></param> <param name="enableAutoDiscovery"></param>
+        /// <summary>
+        /// Creates a new instance using the provided context and registers this instance for automatic discovery if needed. 
+        /// </summary> 
+        /// <param name="serviceContext"></param>
+        /// <param name="enableAutoDiscovery"></param>
         protected BrokerService(StatefulServiceContext serviceContext, bool enableAutoDiscovery = true)
             : base(serviceContext, enableAutoDiscovery)
         {

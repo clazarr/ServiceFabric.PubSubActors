@@ -10,25 +10,26 @@ using Microsoft.ServiceFabric.Actors;
 using Microsoft.ServiceFabric.Data;
 using Microsoft.ServiceFabric.Data.Collections;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
-using Microsoft.ServiceFabric.Services.Remoting.V2.FabricTransport.Runtime;
+using Microsoft.ServiceFabric.Services.Remoting.V1.FabricTransport.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
 using ServiceFabric.PubSubActors.Helpers;
 using ServiceFabric.PubSubActors.Interfaces;
+using ServiceFabric.PubSubActors.PublisherActors;
 using ServiceFabric.PubSubActors.State;
+using ServiceFabric.PubSubActors.SubscriberServices;
 
 namespace ServiceFabric.PubSubActors
 {
-    /// <remarks> Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages from Actors & Services calling <see
-    /// cref="PublisherActorExtensions.PublishMessageAsync"/> and forwards them to <see cref="ISubscriberActor"/> Actors and <see
-    /// cref="ISubscriberService"/> Services. Every message type is mapped to one of the partitions of this service. </remarks>
+    /// <remarks> 
+    /// Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages from Actors & Services calling 
+    /// <see cref="PublisherActorExtensions.PublishMessageAsync"/> and forwards them to <see cref="ISubscriberActor"/> Actors and 
+    /// <see cref="ISubscriberService"/> Services. Every message type is mapped to one of the partitions of this service. 
+    /// </remarks>
     public abstract class BrokerServiceBase : StatefulService, IBrokerService
     {
         #region Public Fields
 
-        /// <summary>
-        /// The name that the <see cref="ServiceReplicaListener" /> instance will get.
-        /// </summary>
-        public const string ListenerName = "StatefulBrokerServiceFabricTransportServiceRemotingListener";
+		private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1);
 
         #endregion Public Fields
 
@@ -39,11 +40,15 @@ namespace ServiceFabric.PubSubActors
         /// </summary>
         protected const string Subscribers = "Queues";
 
-        #endregion Protected Fields
+	    /// <summary>
+	    /// The name that the <see cref="ServiceReplicaListener"/> instance will get.
+	    /// </summary>
+	    public const string ListenerName = BrokerServiceListenerSettings.ListenerName;
 
-        #region Private Fields
-
-        private readonly ManualResetEventSlim _initializer = new ManualResetEventSlim(false);
+		/// <summary>
+		/// When Set, this callback will be used to trace Service messages to.
+		/// </summary>
+		protected Action<string> ServiceEventSourceMessageCallback { get; set; }
 
         private readonly ConcurrentDictionary<string, ReferenceWrapper> _queues =
             new ConcurrentDictionary<string, ReferenceWrapper>();
