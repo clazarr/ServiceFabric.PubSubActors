@@ -23,6 +23,5 @@ using Microsoft.ServiceFabric.Services.Remoting.FabricTransport;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("8e319be1-af0a-4683-997f-7577e369850a")]
-
-[assembly: FabricTransportActorRemotingProvider(RemotingListener = RemotingListener.V2Listener, RemotingClient = RemotingClient.V2Client)]
-[assembly: FabricTransportServiceRemotingProvider(RemotingListener = RemotingListener.V2Listener, RemotingClient = RemotingClient.V2Client)]
+[assembly: FabricTransportActorRemotingProvider(RemotingListener = RemotingListener.V1Listener, RemotingClient = RemotingClient.V1Client)]
+[assembly: FabricTransportServiceRemotingProvider(RemotingListener = RemotingListener.V1Listener, RemotingClient = RemotingClient.V1Client)]
