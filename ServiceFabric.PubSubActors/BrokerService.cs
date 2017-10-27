@@ -9,17 +9,19 @@ using ServiceFabric.PubSubActors.State;
 
 namespace ServiceFabric.PubSubActors
 {
-    /// <remarks> Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages from Actors & Services calling <see
-    /// cref="PublisherActorExtensions.PublishMessageAsync"/> and forwards them to <see cref="ISubscriberActor"/> Actors and <see
-    /// cref="ISubscriberService"/> Services with strict ordering, so less performant than <see cref="BrokerServiceUnordered"/>. Every message type is
-    /// mapped to one of the partitions of this service. </remarks>
+    /// <remarks>
+    /// Base class for a <see cref="StatefulService"/> that serves as a Broker that accepts messages from Actors & Services calling
+    /// <see cref="PublisherActorExtensions.PublishMessageAsync"/> and forwards them to <see cref="ISubscriberActor"/> Actors and
+    /// <see cref="ISubscriberService"/> Services with strict ordering, so less performant than <see cref="BrokerServiceUnordered"/>.
+    /// Every message type is mapped to one of the partitions of this service.
+    /// </remarks>
     public abstract class BrokerService : BrokerServiceBase
     {
         #region Protected Constructors
 
         /// <summary>
-        /// Creates a new instance using the provided context and registers this instance for automatic discovery if needed. 
-        /// </summary> 
+        /// Creates a new instance using the provided context and registers this instance for automatic discovery if needed.
+        /// </summary>
         /// <param name="serviceContext"></param>
         /// <param name="enableAutoDiscovery"></param>
         protected BrokerService(StatefulServiceContext serviceContext, bool enableAutoDiscovery = true)
